@@ -14,7 +14,7 @@ app.use(cors());
 
 // Routes
 app.use("/api/users", require("./routes/userRoutes"));
-app.use("/api/bikes", require("./routes/bikes"));       // correct filename
+app.use("/api/bikes", require("./routes/bikeRoutes"));       // correct filename
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 
 // Root route
