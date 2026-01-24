@@ -1,29 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const Stripe = require("stripe");
-const Booking = require("../models/Booking");
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
+// Create a Stripe payment intent
 router.post("/create-payment-intent", async (req, res) => {
-  const { bookingId, amount } = req.body;
+  const { amount, currency } = req.body;
 
   try {
-    // Create Stripe Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, // amount in paisa
-      currency: "npr",
-      automatic_payment_methods: { enabled: true },
+      amount,
+      currency,
     });
 
-    // Update Booking: mark as pending payment
-    await Booking.findByIdAndUpdate(bookingId, {
-      paymentStatus: "pending",
-      stripePaymentId: paymentIntent.id,
+    res.status(200).json({
+      clientSecret: paymentIntent.client_secret,
     });
-
-    res.json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });

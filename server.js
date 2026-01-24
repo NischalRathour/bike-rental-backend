@@ -14,8 +14,9 @@ app.use(cors());
 
 // Routes
 app.use("/api/users", require("./routes/userRoutes"));
-app.use("/api/bikes", require("./routes/bikeRoutes"));       // correct filename
+app.use("/api/bikes", require("./routes/bikeRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
+app.use("/api/payments", require("./routes/paymentRoutes")); // <-- new payment route
 
 // Root route
 app.get("/", (req, res) => {
