@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 // Protect middleware – checks JWT
-exports.protect = async (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
   if (
@@ -31,11 +31,17 @@ exports.protect = async (req, res, next) => {
 };
 
 // Role-based access middleware
-exports.allowRoles = (...roles) => {
+const allowRoles = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ message: "Access denied" });
     }
     next();
   };
+};
+
+// Export middleware
+module.exports = {
+  protect,
+  allowRoles
 };
