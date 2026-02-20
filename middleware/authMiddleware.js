@@ -1,47 +1,38 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// Protect middleware – checks JWT
 const protect = async (req, res, next) => {
   let token;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer ")
-  ) {
+  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
     try {
       token = req.headers.authorization.split(" ")[1];
-
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      const user = await User.findById(decoded.id).select("-password");
+      // Populate user and role for downstream access
+      req.user = await User.findById(decoded.id).select("-password");
 
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "User not found" });
       }
 
-      req.user = user;
-      return next();
+      next();
     } catch (error) {
-      return res.status(401).json({ message: "Not authorized" });
+      return res.status(401).json({ success: false, message: "Not authorized" });
     }
   } else {
-    return res.status(401).json({ message: "No token" });
+    return res.status(401).json({ success: false, message: "No token provided" });
   }
 };
 
-// Role-based access middleware
 const allowRoles = (...roles) => {
   return (req, res, next) => {
+    // Exact role matching
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Access denied" });
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
     next();
   };
 };
 
-// Export middleware
-module.exports = {
-  protect,
-  allowRoles
-};
+module.exports = { protect, allowRoles };

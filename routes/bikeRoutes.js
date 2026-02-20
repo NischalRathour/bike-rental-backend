@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-
 const {
   getAllBikes,
   getBikeById,
@@ -10,22 +9,18 @@ const {
   deleteBike,
 } = require("../controllers/bikeController");
 
-const { protect } = require("../middleware/authMiddleware");
-const { allowRoles } = require("../middleware/roleMiddleware");
+// ✅ Fix: Use ONLY authMiddleware.js for everything
+const { protect, allowRoles } = require("../middleware/authMiddleware");
 
 /* ================= PUBLIC ROUTES ================= */
 router.get("/", getAllBikes);
-
-/* ================= OWNER ROUTES ================= */
-// ⚠️ owner route MUST come before :id
-router.get("/owner", protect, allowRoles("owner"), getOwnerBikes);
-
-/* ================= PUBLIC BY ID ================= */
 router.get("/:id", getBikeById);
 
-/* ================= OWNER ACTIONS ================= */
-router.post("/", protect, allowRoles("owner"), addBike);
-router.patch("/:id", protect, allowRoles("owner"), updateBike);
-router.delete("/:id", protect, allowRoles("owner"), deleteBike);
+/* ================= OWNER/ADMIN ACTIONS ================= */
+// If you are using "admin" to manage bikes, change "owner" to "admin" here
+router.post("/", protect, allowRoles("admin"), addBike);
+router.get("/owner", protect, allowRoles("admin"), getOwnerBikes);
+router.patch("/:id", protect, allowRoles("admin"), updateBike);
+router.delete("/:id", protect, allowRoles("admin"), deleteBike);
 
 module.exports = router;

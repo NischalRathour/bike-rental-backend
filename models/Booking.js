@@ -26,7 +26,8 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Confirmed", "Cancelled"],
+      // ✅ Capitalized to match our new Controller logic
+      enum: ["Pending", "Confirmed", "Cancelled", "Completed"],
       default: "Pending",
     },
     paymentStatus: {
@@ -34,8 +35,29 @@ const bookingSchema = new mongoose.Schema(
       enum: ["Unpaid", "Paid"],
       default: "Unpaid",
     },
+    // ✅ Added these fields so they actually save to the database
+    paymentId: {
+      type: String,
+    },
+    paymentDate: {
+      type: Date,
+    },
+    paymentAmount: {
+      type: Number,
+    }
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    // This ensures that when we convert to JSON, virtuals are included
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
 );
+
+// Optional: Virtual field to calculate duration in days
+bookingSchema.virtual('durationDays').get(function() {
+  const diff = Math.abs(this.endDate - this.startDate);
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+});
 
 module.exports = mongoose.model("Booking", bookingSchema);
