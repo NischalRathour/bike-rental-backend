@@ -9,7 +9,7 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Populate user and role for downstream access
+      // Populate user for downstream access
       req.user = await User.findById(decoded.id).select("-password");
 
       if (!req.user) {
@@ -27,9 +27,9 @@ const protect = async (req, res, next) => {
 
 const allowRoles = (...roles) => {
   return (req, res, next) => {
-    // Exact role matching
+    // Check if req.user exists and their role matches allowed roles
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return res.status(403).json({ success: false, message: "Access denied: Unauthorized role" });
     }
     next();
   };

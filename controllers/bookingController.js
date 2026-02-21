@@ -1,17 +1,13 @@
 const Booking = require("../models/Booking");
 
-// ✅ 1. View own bookings (FIXES THE BLANK DASHBOARD)
+// ✅ 1. View own bookings
 exports.getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ user: req.user._id })
-      .populate("bike", "name price image pricePerHour")
+      .populate("bike", "name price image")
       .sort({ createdAt: -1 });
     
-    // Frontend expects response.data.bookings
-    res.json({ 
-      success: true, 
-      bookings 
-    });
+    res.json({ success: true, bookings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -27,10 +23,7 @@ exports.createBooking = async (req, res) => {
     });
 
     const savedBooking = await booking.save();
-    res.status(201).json({ 
-      success: true, 
-      booking: savedBooking 
-    });
+    res.status(201).json({ success: true, booking: savedBooking });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -40,11 +33,9 @@ exports.createBooking = async (req, res) => {
 exports.updateBookingWithPayment = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    
-    if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
-    }
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
 
+    // String conversion for comparison
     if (booking.user.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
@@ -55,8 +46,8 @@ exports.updateBookingWithPayment = async (req, res) => {
     booking.paymentDate = new Date();
     booking.paymentAmount = req.body.amount;
     
-    const updatedBooking = await booking.save();
-    res.json({ success: true, booking: updatedBooking });
+    await booking.save();
+    res.json({ success: true, booking });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -69,15 +60,13 @@ exports.getBookingById = async (req, res) => {
       .populate("bike", "name price image")
       .populate("user", "name email");
 
-    if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
-    }
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
 
     const isOwner = booking.user._id.toString() === req.user.id;
     const isAdmin = req.user.role === 'admin';
 
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({ success: false, message: "Unauthorized" });
+      return res.status(403).json({ success: false, message: "Unauthorized access to record" });
     }
 
     res.json({ success: true, booking });

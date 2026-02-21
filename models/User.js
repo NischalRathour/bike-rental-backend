@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "owner", "admin"], // roles you can assign
+      enum: ["customer", "owner", "admin"], // ✅ Includes all three actors
       default: "customer",
     },
   },

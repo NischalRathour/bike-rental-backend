@@ -26,7 +26,8 @@ const userRoutes = require('./routes/userRoutes');
 const bikeRoutes = require('./routes/bikeRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
-const adminRoutes = require('./routes/adminRoutes'); // ✅ The consolidated file
+const adminRoutes = require('./routes/adminRoutes'); 
+const ownerRoutes = require('./routes/ownerRoutes'); // ✅ Added Owner Routes
 
 // 4. Mount Routes
 app.use("/api/users", userRoutes);
@@ -36,6 +37,9 @@ app.use("/api/payments", paymentRoutes);
 
 // ✅ Mount consolidated Admin routes under one namespace
 app.use("/api/admin", adminRoutes); 
+
+// ✅ Mount Owner routes under the /api/owner namespace
+app.use("/api/owner", ownerRoutes); 
 
 // 5. Static Folder for Images
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
