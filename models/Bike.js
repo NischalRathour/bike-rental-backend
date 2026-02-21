@@ -25,6 +25,11 @@ const bikeSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // 🌿 Eco-Tracking Field
+    co2SavedPerKm: {
+      type: Number,
+      default: 0.15, // Default: 0.15kg saved per km compared to cars
+    },
   },
   { timestamps: true }
 );
