@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { adminLogin, checkAdminSession } = require('../controllers/adminAuthController');
 
-// 🛡️ DOUBLE-CHECK THESE NAMES match the exports in adminController.js
+const { adminLogin, adminLogout, checkAdminSession } = require('../controllers/adminAuthController');
 const { 
   getDashboardStats, 
+  getAllUsers, 
   updateBookingStatusAdmin, 
-  deleteBookingAdmin,
-  addBikeAdmin,
-  updateBikeAdmin,
-  deleteBikeAdmin,
+  deleteBookingAdmin, 
+  addBikeAdmin, 
+  updateBikeAdmin, 
+  deleteBikeAdmin, 
   generateReportData 
 } = require('../controllers/adminController'); 
 
@@ -20,16 +20,18 @@ router.post('/login', adminLogin);
 router.use(protect, allowRoles('admin'));
 
 router.get('/check-session', checkAdminSession);
+router.post('/logout', adminLogout);
 router.get('/dashboard', getDashboardStats);
-router.get('/report', generateReportData); // 🚨 CHECK THIS LINE (Line 23 area)
+router.get('/users', getAllUsers); 
+router.get('/report', generateReportData); 
 
-// Bike Management
+// Fleet
 router.post('/bikes', addBikeAdmin);
 router.put('/bikes/:id', updateBikeAdmin);
 router.delete('/bikes/:id', deleteBikeAdmin);
 
-// Booking Management
-router.put('/bookings/:id/status', updateBookingStatusAdmin);
-router.delete('/bookings/:id', deleteBookingAdmin);
+// Bookings - This is where your error was occurring
+router.put('/bookings/:id/status', updateBookingStatusAdmin); 
+router.delete('/bookings/:id', deleteBookingAdmin); 
 
 module.exports = router;
