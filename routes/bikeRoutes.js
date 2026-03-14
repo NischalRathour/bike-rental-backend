@@ -9,18 +9,18 @@ const {
   deleteBike,
 } = require("../controllers/bikeController");
 
-// ✅ Fix: Use ONLY authMiddleware.js for everything
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 
 /* ================= PUBLIC ROUTES ================= */
+// Must stay at the top
 router.get("/", getAllBikes);
-router.get("/:id", getBikeById);
+router.get("/:id", getBikeById); 
 
-/* ================= OWNER/ADMIN ACTIONS ================= */
-// If you are using "admin" to manage bikes, change "owner" to "admin" here
-router.post("/", protect, allowRoles("admin"), addBike);
-router.get("/owner", protect, allowRoles("admin"), getOwnerBikes);
-router.patch("/:id", protect, allowRoles("admin"), updateBike);
-router.delete("/:id", protect, allowRoles("admin"), deleteBike);
+/* ================= ADMIN/OWNER ACTIONS ================= */
+// Protect all management routes
+router.post("/", protect, allowRoles("admin", "owner"), addBike);
+router.get("/my-inventory", protect, allowRoles("admin", "owner"), getOwnerBikes);
+router.patch("/:id", protect, allowRoles("admin", "owner"), updateBike);
+router.delete("/:id", protect, allowRoles("admin", "owner"), deleteBike);
 
 module.exports = router;

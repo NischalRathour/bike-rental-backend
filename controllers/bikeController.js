@@ -1,7 +1,7 @@
 const Bike = require("../models/Bike");
 const mongoose = require("mongoose");
 
-// PUBLIC – anyone can see all bikes
+/** 🌍 PUBLIC: View all bikes */
 exports.getAllBikes = async (req, res) => {
   try {
     const bikes = await Bike.find().populate("owner", "name email");
@@ -11,102 +11,88 @@ exports.getAllBikes = async (req, res) => {
   }
 };
 
-// PUBLIC – get bike by ID
+/** 🔍 PUBLIC: View single bike by ID */
 exports.getBikeById = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid bike ID" });
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Vehicle Reference Format" });
     }
-
-    const bike = await Bike.findById(req.params.id).populate(
-      "owner",
-      "name email"
-    );
-
+    const bike = await Bike.findById(id).populate("owner", "name email");
     if (!bike) {
-      return res.status(404).json({ message: "Bike not found" });
+      return res.status(404).json({ message: "Vehicle not found in Kathmandu database" });
     }
-
     res.json(bike);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-// OWNER – add bike
+/** 🏗️ OWNER/ADMIN: Add bike */
 exports.addBike = async (req, res) => {
   try {
     const bike = await Bike.create({
-      name: req.body.name,
-      price: req.body.price,
-      brand: req.body.brand,
-      available: req.body.available ?? true,
+      ...req.body,
       owner: req.user._id,
     });
-
     res.status(201).json(bike);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
-// OWNER – view own bikes
+/** 📋 OWNER/ADMIN: Get their own inventory */
 exports.getOwnerBikes = async (req, res) => {
   try {
-    const bikes = await Bike.find({ owner: req.user._id });
+    // If Admin, they see everything; if Owner, they see their own
+    const query = req.user.role === 'admin' ? {} : { owner: req.user._id };
+    const bikes = await Bike.find(query);
     res.json(bikes);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// OWNER – update bike
+/** 📝 OWNER/ADMIN: Update bike */
 exports.updateBike = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid bike ID" });
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid ID" });
     }
 
-    const bike = await Bike.findOne({
-      _id: req.params.id,
-      owner: req.user._id,
-    });
+    const bike = await Bike.findById(id);
+    if (!bike) return res.status(404).json({ message: "Bike not found" });
 
-    if (!bike) {
-      return res
-        .status(404)
-        .json({ message: "Bike not found or not yours" });
+    // Security check: Only owner or admin can update
+    if (bike.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Not authorized to update this unit" });
     }
 
-    Object.assign(bike, req.body);
-    await bike.save();
-
-    res.json(bike);
+    const updatedBike = await Bike.findByIdAndUpdate(id, req.body, { new: true });
+    res.json(updatedBike);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
-// OWNER – delete bike
+/** 🗑️ OWNER/ADMIN: Delete bike */
 exports.deleteBike = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid bike ID" });
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid ID" });
     }
 
-    const bike = await Bike.findOne({
-      _id: req.params.id,
-      owner: req.user._id,
-    });
+    const bike = await Bike.findById(id);
+    if (!bike) return res.status(404).json({ message: "Bike not found" });
 
-    if (!bike) {
-      return res
-        .status(404)
-        .json({ message: "Bike not found or not yours" });
+    if (bike.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Not authorized to decommission this unit" });
     }
 
-    await bike.deleteOne();
-    res.json({ message: "Bike deleted successfully" });
+    await Bike.findByIdAndDelete(id);
+    res.json({ message: "Bike deleted successfully from Kathmandu fleet" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
