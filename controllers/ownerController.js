@@ -1,10 +1,7 @@
 const Bike = require("../models/Bike");
 const Booking = require("../models/Booking");
 
-/**
- * 🚲 FETCH OWNER FLEET
- * Returns only bikes belonging to the authenticated owner
- */
+/** 🚲 FETCH OWNER FLEET */
 exports.getOwnerBikes = async (req, res) => {
   try {
     const bikes = await Bike.find({ owner: req.user.id });
@@ -14,14 +11,12 @@ exports.getOwnerBikes = async (req, res) => {
   }
 };
 
-/**
- * ➕ ADD BIKE
- */
+/** ➕ ADD BIKE */
 exports.addOwnerBike = async (req, res) => {
   try {
     const bike = await Bike.create({
       ...req.body,
-      owner: req.user.id // Links bike to owner automatically
+      owner: req.user.id
     });
     res.status(201).json({ success: true, bike });
   } catch (error) {
@@ -29,13 +24,11 @@ exports.addOwnerBike = async (req, res) => {
   }
 };
 
-/**
- * 📝 UPDATE BIKE
- */
+/** 📝 UPDATE BIKE */
 exports.updateOwnerBike = async (req, res) => {
   try {
     const bike = await Bike.findOneAndUpdate(
-      { _id: req.params.id, owner: req.user.id }, // Security filter
+      { _id: req.params.id, owner: req.user.id },
       req.body,
       { new: true, runValidators: true }
     );
@@ -46,9 +39,31 @@ exports.updateOwnerBike = async (req, res) => {
   }
 };
 
-/**
- * 🗑️ DELETE BIKE
- */
+/** 🛠️ TOGGLE MAINTENANCE STATUS */
+exports.toggleMaintenance = async (req, res) => {
+  try {
+    const bike = await Bike.findOne({ _id: req.params.id, owner: req.user.id });
+    if (!bike) return res.status(404).json({ success: false, message: "Bike not found" });
+
+    if (bike.status === 'Rented') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Unit is currently with a client. Cannot enter maintenance." 
+      });
+    }
+
+    const newStatus = bike.status === 'Maintenance' ? 'Available' : 'Maintenance';
+    bike.status = newStatus;
+    bike.available = (newStatus === 'Available');
+    
+    await bike.save();
+    res.json({ success: true, status: newStatus, bike });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Status sync failed." });
+  }
+};
+
+/** 🗑️ DELETE BIKE */
 exports.deleteOwnerBike = async (req, res) => {
   try {
     const bike = await Bike.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
@@ -59,29 +74,15 @@ exports.deleteOwnerBike = async (req, res) => {
   }
 };
 
-/**
- * 💰 EARNINGS REPORT
- * Aggregates paid revenue specifically for this owner's bikes
- */
+/** 💰 EARNINGS REPORT */
 exports.getOwnerEarnings = async (req, res) => {
   try {
     const ownerBikes = await Bike.find({ owner: req.user.id }).select("_id");
     const bikeIds = ownerBikes.map(bike => bike._id);
 
     const earningsData = await Booking.aggregate([
-      { 
-        $match: { 
-          bike: { $in: bikeIds }, 
-          paymentStatus: { $in: ["Paid", "paid"] } 
-        } 
-      },
-      {
-        $group: {
-          _id: null,
-          totalEarnings: { $sum: "$totalPrice" },
-          totalRentals: { $sum: 1 }
-        }
-      }
+      { $match: { bike: { $in: bikeIds }, paymentStatus: { $in: ["Paid", "paid"] } } },
+      { $group: { _id: null, totalEarnings: { $sum: "$totalPrice" }, totalRentals: { $sum: 1 } } }
     ]);
 
     res.json({
@@ -93,5 +94,25 @@ exports.getOwnerEarnings = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/** 🔔 LIVE RENTAL NOTIFICATIONS */
+exports.getOwnerActiveRentals = async (req, res) => {
+  try {
+    const ownerBikes = await Bike.find({ owner: req.user.id }).select("_id");
+    const bikeIds = ownerBikes.map(bike => bike._id);
+
+    const activeRentals = await Booking.find({ 
+      bike: { $in: bikeIds },
+      status: { $in: ["Confirmed", "Pending"] }
+    })
+    .populate("user", "name email")
+    .populate("bike", "name images")
+    .sort({ startDate: 1 });
+
+    res.json({ success: true, activeRentals });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Notification sync failed." });
   }
 };

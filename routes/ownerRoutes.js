@@ -5,17 +5,20 @@ const {
   addOwnerBike, 
   updateOwnerBike, 
   deleteOwnerBike,
-  getOwnerEarnings 
+  getOwnerEarnings,
+  getOwnerActiveRentals,
+  toggleMaintenance
 } = require('../controllers/ownerController');
 const { protect, allowRoles } = require('../middleware/authMiddleware');
 
-// Ensure only 'owner' role can enter
 router.use(protect, allowRoles('owner'));
 
 router.get('/my-fleet', getOwnerBikes);
 router.get('/earnings', getOwnerEarnings);
+router.get('/active-rentals', getOwnerActiveRentals);
 router.post('/add-bike', addOwnerBike);
 router.put('/bike/:id', updateOwnerBike);
+router.patch('/bike/:id/maintenance', toggleMaintenance); // ✅ Added
 router.delete('/bike/:id', deleteOwnerBike);
 
 module.exports = router;

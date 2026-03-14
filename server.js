@@ -14,7 +14,8 @@ const app = express();
 app.use(cors({
     origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    // ✅ FIXED: Added 'PATCH' to the allowed methods list
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], 
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -27,7 +28,7 @@ const bikeRoutes = require('./routes/bikeRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
-const ownerRoutes = require('./routes/ownerRoutes'); // ✅ Added Owner Routes
+const ownerRoutes = require('./routes/ownerRoutes'); 
 
 // 4. Mount Routes
 app.use("/api/users", userRoutes);
@@ -35,35 +36,46 @@ app.use("/api/bikes", bikeRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
 
-// ✅ Mount consolidated Admin routes under one namespace
+// ✅ Mount consolidated Admin routes
 app.use("/api/admin", adminRoutes); 
 
-// ✅ Mount Owner routes under the /api/owner namespace
+// ✅ Mount Owner routes
 app.use("/api/owner", ownerRoutes); 
 
 // 5. Static Folder for Images
+// Ensure the 'uploads' folder actually exists in your root directory
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
 // 6. Base Health Check
 app.get("/", (req, res) => {
-    res.json({ message: "Ride N Roar API is running successfully!" });
-});
-
-// 7. Global 404 & Error Handlers
-app.use((req, res, next) => {
-    res.status(404).json({ success: false, message: "Route not found" });
-});
-
-app.use((err, req, res, next) => {
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    res.status(statusCode).json({
-        success: false,
-        message: err.message,
+    res.json({ 
+        success: true,
+        message: "Ride N Roar API is running successfully!",
+        systemTime: new Date().toLocaleString(),
+        location: "Kathmandu, Nepal"
     });
 });
 
-// 8. Start Server
+// 7. Global 404 Handler
+app.use((req, res, next) => {
+    res.status(404).json({ success: false, message: "Requested Endpoint Not Found" });
+});
+
+// 8. Global Error Handler
+app.use((err, req, res, next) => {
+    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+    console.error(`[Error Log]: ${err.message}`);
+    res.status(statusCode).json({
+        success: false,
+        message: err.message,
+        // Stack trace only shown in development mode
+        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+    });
+});
+
+// 9. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server Roaring on port ${PORT}`);
+    console.log(`📡 Local Access: http://localhost:${PORT}`);
 });
