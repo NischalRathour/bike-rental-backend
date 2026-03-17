@@ -11,23 +11,27 @@ const {
 
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 
-// 1. Create a new booking
-router.post("/", protect, allowRoles("customer"), createBooking);
+/* ================= CUSTOMER ROUTES ================= */
 
-// 2. View logged-in customer's bookings 
-// ✅ CRITICAL: This MUST stay above /:id to avoid route conflicts
+// 1. View logged-in customer's bookings (MUST be above /:id)
 router.get("/my", protect, allowRoles("customer"), getMyBookings);
 
-// 3. Process payment for a booking
-router.put("/:id/pay", protect, allowRoles("customer"), updateBookingWithPayment);
+// 2. Create a new booking
+router.post("/", protect, allowRoles("customer"), createBooking);
 
-// 4. Get details of a single booking (Used by Customer Payment & Admin view)
+// 3. Get details of a single booking (Used for Payment Page)
 router.get("/:id", protect, allowRoles("customer", "admin"), getBookingById);
 
+// 4. Process payment for a booking
+router.put("/:id/pay", protect, allowRoles("customer"), updateBookingWithPayment);
+
+
+/* ================= ADMIN ROUTES ================= */
+
 // 5. Admin: View all bookings in the system
-router.get("/", protect, allowRoles("admin"), getAllBookings);
+router.get("/admin/all", protect, allowRoles("admin"), getAllBookings);
 
 // 6. Admin: Manually update booking status
-router.put("/:id", protect, allowRoles("admin"), updateBookingStatus);
+router.put("/admin/:id", protect, allowRoles("admin"), updateBookingStatus);
 
 module.exports = router;

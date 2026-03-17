@@ -15,16 +15,17 @@ exports.getAllBikes = async (req, res) => {
 exports.getBikeById = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid Vehicle Reference Format" });
-    }
+    
+    // ✅ REMOVED: Strict ObjectId validation to allow "b1", "b2", etc.
     const bike = await Bike.findById(id).populate("owner", "name email");
+    
     if (!bike) {
       return res.status(404).json({ message: "Vehicle not found in Kathmandu database" });
     }
     res.json(bike);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    // If Mongoose fails to cast, it means the ID is truly malformed or missing
+    res.status(400).json({ message: "Error retrieving vehicle details", error: error.message });
   }
 };
 
@@ -44,7 +45,6 @@ exports.addBike = async (req, res) => {
 /** 📋 OWNER/ADMIN: Get their own inventory */
 exports.getOwnerBikes = async (req, res) => {
   try {
-    // If Admin, they see everything; if Owner, they see their own
     const query = req.user.role === 'admin' ? {} : { owner: req.user._id };
     const bikes = await Bike.find(query);
     res.json(bikes);
@@ -57,15 +57,12 @@ exports.getOwnerBikes = async (req, res) => {
 exports.updateBike = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid ID" });
-    }
-
     const bike = await Bike.findById(id);
+    
     if (!bike) return res.status(404).json({ message: "Bike not found" });
 
-    // Security check: Only owner or admin can update
-    if (bike.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    // Security check
+    if (bike.owner && bike.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: "Not authorized to update this unit" });
     }
 
@@ -80,14 +77,11 @@ exports.updateBike = async (req, res) => {
 exports.deleteBike = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid ID" });
-    }
-
     const bike = await Bike.findById(id);
+    
     if (!bike) return res.status(404).json({ message: "Bike not found" });
 
-    if (bike.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (bike.owner && bike.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: "Not authorized to decommission this unit" });
     }
 

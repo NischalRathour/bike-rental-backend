@@ -3,8 +3,8 @@ const Booking = require("../models/Booking");
 // ✅ 1. View own bookings
 exports.getMyBookings = async (req, res) => {
   try {
+    // We don't populate "bike" here because your bikes might be static strings "b1"
     const bookings = await Booking.find({ user: req.user._id })
-      .populate("bike", "name price image")
       .sort({ createdAt: -1 });
     
     res.json({ success: true, bookings });
@@ -16,15 +16,23 @@ exports.getMyBookings = async (req, res) => {
 // ✅ 2. Create a new booking
 exports.createBooking = async (req, res) => {
   try {
+    const { bikeId, startDate, endDate, totalPrice, days } = req.body;
+
     const booking = new Booking({
-      ...req.body,
       user: req.user._id,
-      status: 'Pending'
+      bike: bikeId, // ✅ Accepts "b1", "b2" etc as Strings
+      startDate,
+      endDate,
+      totalPrice,
+      days,
+      status: 'Pending',
+      paymentStatus: 'Unpaid'
     });
 
     const savedBooking = await booking.save();
     res.status(201).json({ success: true, booking: savedBooking });
   } catch (error) {
+    console.error("Booking Creation Error:", error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -35,7 +43,6 @@ exports.updateBookingWithPayment = async (req, res) => {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
 
-    // String conversion for comparison
     if (booking.user.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
@@ -44,7 +51,7 @@ exports.updateBookingWithPayment = async (req, res) => {
     booking.paymentStatus = 'Paid'; 
     booking.paymentId = req.body.paymentId;
     booking.paymentDate = new Date();
-    booking.paymentAmount = req.body.amount;
+    booking.paymentAmount = req.body.amount || booking.totalPrice;
     
     await booking.save();
     res.json({ success: true, booking });
@@ -57,7 +64,6 @@ exports.updateBookingWithPayment = async (req, res) => {
 exports.getBookingById = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("bike", "name price image")
       .populate("user", "name email");
 
     if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
@@ -66,12 +72,12 @@ exports.getBookingById = async (req, res) => {
     const isAdmin = req.user.role === 'admin';
 
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({ success: false, message: "Unauthorized access to record" });
+      return res.status(403).json({ success: false, message: "Unauthorized access" });
     }
 
     res.json({ success: true, booking });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+    res.status(500).json({ success: false, message: "Server Error retrieving booking" });
   }
 };
 
@@ -80,7 +86,6 @@ exports.getAllBookings = async (req, res) => {
   try {
     const bookings = await Booking.find()
       .populate("user", "name email")
-      .populate("bike", "name price")
       .sort({ createdAt: -1 });
     
     res.json({ success: true, bookings });

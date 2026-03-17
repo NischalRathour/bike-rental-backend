@@ -14,7 +14,6 @@ const app = express();
 app.use(cors({
     origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
     credentials: true,
-    // ✅ FIXED: Added 'PATCH' to the allowed methods list
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], 
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -29,22 +28,22 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
 const ownerRoutes = require('./routes/ownerRoutes'); 
+const tourRoutes = require('./routes/tourRoutes');
+const blogRoutes = require('./routes/blogRoutes'); // ✅ Added
 
 // 4. Mount Routes
 app.use("/api/users", userRoutes);
 app.use("/api/bikes", bikeRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
-
-// ✅ Mount consolidated Admin routes
 app.use("/api/admin", adminRoutes); 
-
-// ✅ Mount Owner routes
 app.use("/api/owner", ownerRoutes); 
+app.use("/api/tours", tourRoutes);
+app.use("/api/blog", blogRoutes); // ✅ Mounted at /api/blog
 
-// 5. Static Folder for Images
-// Ensure the 'uploads' folder actually exists in your root directory
+// 5. Static Folders for Images
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
+app.use('/images', express.static(path.join(__dirname, '/public/images')));
 
 // 6. Base Health Check
 app.get("/", (req, res) => {
@@ -58,17 +57,21 @@ app.get("/", (req, res) => {
 
 // 7. Global 404 Handler
 app.use((req, res, next) => {
-    res.status(404).json({ success: false, message: "Requested Endpoint Not Found" });
+    const error = new Error(`Not Found - ${req.originalUrl}`);
+    res.status(404);
+    next(error);
 });
 
 // 8. Global Error Handler
 app.use((err, req, res, next) => {
+    if (req.originalUrl.includes('hot-update.json')) {
+        return res.status(404).json({ ignored: true });
+    }
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    console.error(`[Error Log]: ${err.message}`);
+    console.error(`❌ [Backend Error]: ${err.message}`);
     res.status(statusCode).json({
         success: false,
         message: err.message,
-        // Stack trace only shown in development mode
         stack: process.env.NODE_ENV === 'production' ? null : err.stack,
     });
 });
@@ -76,6 +79,8 @@ app.use((err, req, res, next) => {
 // 9. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server Roaring on port ${PORT}`);
-    console.log(`📡 Local Access: http://localhost:${PORT}`);
+    console.log("-----------------------------------------");
+    console.log(`🚀 Ride N Roar Server Roaring on Port ${PORT}`);
+    console.log(`📡 API Base: http://localhost:${PORT}/api`);
+    console.log("-----------------------------------------");
 });

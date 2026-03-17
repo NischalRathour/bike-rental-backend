@@ -7,15 +7,33 @@ const bikeSchema = new mongoose.Schema(
       required: [true, "Bike name is required"],
       trim: true,
     },
+    // ✅ Added to match Frontend fleet.js
+    _id: {
+      type: String, // Allow "b1", "b2" for demo OR ObjectId for production
+      required: true
+    },
     price: {
       type: Number,
       required: [true, "Bike price is required"],
       min: [0, "Price cannot be negative"],
     },
+    type: {
+      type: String,
+      enum: ["Commuter", "Adventure", "Sport", "Cruiser", "Scooter", "Dirt"],
+      default: "Commuter"
+    },
+    cc: {
+      type: String,
+      default: "150cc"
+    },
+    images: {
+      type: [String],
+      default: ["/images/default-bike.jpg"]
+    },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false, // Set to false so "System" bikes don't need an owner ID
     },
     brand: {
       type: String,
@@ -25,10 +43,9 @@ const bikeSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    // 🌿 Eco-Tracking Field
     co2SavedPerKm: {
       type: Number,
-      default: 0.15, // Default: 0.15kg saved per km compared to cars
+      default: 0.15,
     },
   },
   { timestamps: true }
