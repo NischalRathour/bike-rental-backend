@@ -3,7 +3,6 @@ const Booking = require("../models/Booking");
 // ✅ 1. View own bookings
 exports.getMyBookings = async (req, res) => {
   try {
-    // We don't populate "bike" here because your bikes might be static strings "b1"
     const bookings = await Booking.find({ user: req.user._id })
       .sort({ createdAt: -1 });
     
@@ -13,20 +12,29 @@ exports.getMyBookings = async (req, res) => {
   }
 };
 
-// ✅ 2. Create a new booking
+// ✅ 2. Create a new booking (INTEGRATED ECO-LOGIC)
 exports.createBooking = async (req, res) => {
   try {
     const { bikeId, startDate, endDate, totalPrice, days } = req.body;
 
+    // --- ECO-TRACKING CALCULATION ---
+    // Average car emission saved by using a bike (~2.4kg per average daily travel)
+    const co2Calculation = (days * 2.4).toFixed(1); 
+    // Gamification: 50 base points + 10 points per day
+    const pointsCalculation = 50 + (days * 10);
+
     const booking = new Booking({
       user: req.user._id,
-      bike: bikeId, // ✅ Accepts "b1", "b2" etc as Strings
+      bike: bikeId, 
       startDate,
       endDate,
       totalPrice,
       days,
       status: 'Pending',
-      paymentStatus: 'Unpaid'
+      paymentStatus: 'Unpaid',
+      // ✅ Injecting FDD Artefacts
+      co2Saved: co2Calculation,
+      rewardPoints: pointsCalculation
     });
 
     const savedBooking = await booking.save();
@@ -47,6 +55,7 @@ exports.updateBookingWithPayment = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
+    // When payment is successful, we finalize the status
     booking.status = 'Confirmed'; 
     booking.paymentStatus = 'Paid'; 
     booking.paymentId = req.body.paymentId;

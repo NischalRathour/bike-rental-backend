@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
+// Import all required controllers
 const { 
   adminLogin, 
   adminLogout, 
@@ -10,40 +11,45 @@ const {
 const { 
   getDashboardStats, 
   getAllUsers, 
-  deleteUserAdmin,
-  getAllBookingsAdmin, // ✅ Added for the list view
+  deleteUserAdmin, 
+  getAllBookingsAdmin, 
   updateBookingStatusAdmin, 
   deleteBookingAdmin, 
   addBikeAdmin, 
   updateBikeAdmin, 
   deleteBikeAdmin, 
+  updateBikeStatusAdmin,
   generateReportData 
 } = require('../controllers/adminController'); 
 
 const { protect, allowRoles } = require('../middleware/authMiddleware');
 
+// 1. Public Admin Routes
 router.post('/login', adminLogin);
 
+// 2. Protected Admin Routes
 router.use(protect, allowRoles('admin'));
 
-// --- IDENTITY ---
+// --- OPERATIONS INTELLIGENCE (FIXED ENDPOINT) ---
+// This handles the call to /api/admin/insights
+router.get('/insights', getDashboardStats); 
+
+// --- IDENTITY & SESSION ---
 router.get('/check-session', checkAdminSession);
 router.post('/logout', adminLogout);
 router.get('/users', getAllUsers); 
 router.delete('/users/:id', deleteUserAdmin);
 
-// --- ANALYTICS ---
-router.get('/dashboard', getDashboardStats);
-router.get('/report', generateReportData); 
-
-// --- FLEET ---
+// --- FLEET MANAGEMENT ---
 router.post('/bikes', addBikeAdmin);
 router.put('/bikes/:id', updateBikeAdmin);
+router.patch('/bikes/:id/status', updateBikeStatusAdmin);
 router.delete('/bikes/:id', deleteBikeAdmin);
 
-// --- BOOKING OPERATIONS (APPROVED & CANCEL) ---
-router.get('/bookings', getAllBookingsAdmin); // ✅ Added: Get all bookings for admin
+// --- GLOBAL BOOKING LEDGER ---
+router.get('/bookings', getAllBookingsAdmin);
 router.put('/bookings/:id/status', updateBookingStatusAdmin); 
 router.delete('/bookings/:id', deleteBookingAdmin); 
+router.get('/report', generateReportData);
 
 module.exports = router;

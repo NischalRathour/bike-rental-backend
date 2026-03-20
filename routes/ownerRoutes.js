@@ -1,24 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { 
-  getOwnerBikes, 
+  getOwnerDashboard, 
   addOwnerBike, 
   updateOwnerBike, 
   deleteOwnerBike,
-  getOwnerEarnings,
-  getOwnerActiveRentals,
   toggleMaintenance
 } = require('../controllers/ownerController');
 const { protect, allowRoles } = require('../middleware/authMiddleware');
 
-router.use(protect, allowRoles('owner'));
+// All routes are protected to Owners and Admins
+router.use(protect, allowRoles('owner', 'admin'));
 
-router.get('/my-fleet', getOwnerBikes);
-router.get('/earnings', getOwnerEarnings);
-router.get('/active-rentals', getOwnerActiveRentals);
+router.get('/dashboard', getOwnerDashboard);
 router.post('/add-bike', addOwnerBike);
 router.put('/bike/:id', updateOwnerBike);
-router.patch('/bike/:id/maintenance', toggleMaintenance); // ✅ Added
+router.patch('/bike/:id/maintenance', toggleMaintenance);
 router.delete('/bike/:id', deleteOwnerBike);
 
 module.exports = router;
