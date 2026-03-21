@@ -2,29 +2,49 @@ const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    bike: { type: String, required: true }, // Supporting "b1", "b2" or ObjectId
+    user: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
+      required: true 
+    },
+    
+    // 🏍️ FIXED: Changed from ObjectId to String to match your Bike _id format
+    // This allows the "Cast to ObjectId" error to disappear
+    bikes: [{ 
+      type: String, 
+      ref: "Bike", 
+      required: true 
+    }], 
+
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     totalPrice: { type: Number, required: true },
-    days: { type: Number, default: 1 },
-    status: { type: String, enum: ["Pending", "Confirmed", "Cancelled", "Completed"], default: "Pending" },
-    paymentStatus: { type: String, enum: ["Unpaid", "Paid"], default: "Unpaid" },
+    
+    bookingType: { 
+      type: String, 
+      enum: ["Solo", "Group"], 
+      default: "Solo" 
+    },
+    
+    status: { 
+      type: String, 
+      enum: ["Pending", "Confirmed", "Cancelled", "Completed"], 
+      default: "Pending" 
+    },
+    
+    paymentStatus: { 
+      type: String, 
+      enum: ["Unpaid", "Paid"], 
+      default: "Unpaid" 
+    },
+    
     paymentId: { type: String },
-    // 🌿 NEW ECO-TRACKING FIELDS
+    
+    // 🌿 BUSINESS LOGIC: Eco-Tracking
     co2Saved: { type: Number, default: 0 }, 
     rewardPoints: { type: Number, default: 0 }
   },
-  { 
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
-  }
+  { timestamps: true }
 );
-
-bookingSchema.virtual('durationDays').get(function() {
-  const diff = Math.abs(this.endDate - this.startDate);
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-});
 
 module.exports = mongoose.model("Booking", bookingSchema);
