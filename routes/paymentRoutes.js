@@ -4,13 +4,12 @@ const {
     createPaymentIntent, 
     confirmPayment 
 } = require("../controllers/paymentController");
-
 const { protect } = require("../middleware/authMiddleware");
 
-// Route to initialize the Stripe Payment (gets the Client Secret)
-router.post("/create-intent", protect, createPaymentIntent);
+// All payment routes require a logged-in user
+router.use(protect);
 
-// Route to update the database after Stripe confirms the card is charged
-router.post("/confirm", protect, confirmPayment);
+router.post("/create-intent", createPaymentIntent);
+router.post("/confirm", confirmPayment);
 
 module.exports = router;

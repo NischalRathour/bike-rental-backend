@@ -1,52 +1,61 @@
 const express = require('express');
 const router = express.Router();
 
-// 1. Import Auth Controllers
+/**
+ * 🛠️ CONTROLLER IMPORTS
+ * Logic for Authentication and System Management
+ */
 const { 
-  adminLogin, 
-  adminLogout, 
-  checkAdminSession 
+    adminLogin, 
+    adminLogout, 
+    checkAdminSession 
 } = require('../controllers/adminAuthController');
 
-// 2. Import Admin Operations (Ensure path is correct)
 const { 
-  getDashboardStats, 
-  getAllUsers, 
-  deleteUserAdmin, 
-  getAllBookingsAdmin, 
-  updateBookingStatusAdmin, 
-  deleteBookingAdmin, 
-  addBikeAdmin, 
-  updateBikeAdmin, 
-  deleteBikeAdmin, 
-  updateBikeStatusAdmin,
-  generateReportData 
+    getDashboardStats, 
+    getAllUsers, 
+    deleteUserAdmin, 
+    getAllBookingsAdmin, 
+    updateBookingStatusAdmin, 
+    deleteBookingAdmin, 
+    addBikeAdmin, 
+    updateBikeAdmin, 
+    deleteBikeAdmin, 
+    updateBikeStatusAdmin,
+    generateReportData 
 } = require('../controllers/adminController'); 
 
+// 🛡️ MIDDLEWARE IMPORTS
 const { protect, allowRoles } = require('../middleware/authMiddleware');
 
-// --- PUBLIC ROUTES ---
+/**
+ * 🔓 PUBLIC ADMIN ROUTES
+ * Only the login route is accessible without a token.
+ */
 router.post('/login', adminLogin);
 
-// --- PROTECTED ROUTES (Admin Only) ---
+/**
+ * 🔒 PROTECTED ADMIN ROUTES (SHIELDED)
+ * Every route below this line is locked behind 'protect' and 'allowRoles'.
+ */
 router.use(protect, allowRoles('admin'));
 
-// 📊 DASHBOARD & SESSION
+// 📊 DASHBOARD & SESSION INTELLIGENCE
 router.get('/insights', getDashboardStats); 
 router.get('/check-session', checkAdminSession);
 router.post('/logout', adminLogout);
 
-// 👤 USER MANAGEMENT
+// 👤 USER MANAGEMENT (IDENTITY DIRECTORY)
 router.get('/users', getAllUsers); 
 router.delete('/users/:id', deleteUserAdmin);
 
-// 🏍️ FLEET MANAGEMENT
+// 🏍️ FLEET (BIKE) MANAGEMENT
 router.post('/bikes', addBikeAdmin);
 router.put('/bikes/:id', updateBikeAdmin);
 router.patch('/bikes/:id/status', updateBikeStatusAdmin);
 router.delete('/bikes/:id', deleteBikeAdmin);
 
-// 📋 BOOKING MANAGEMENT & REPORTS
+// 📋 BOOKING OPERATIONS & REPORTING
 router.get('/bookings', getAllBookingsAdmin);
 router.put('/bookings/:id/status', updateBookingStatusAdmin); 
 router.delete('/bookings/:id', deleteBookingAdmin); 

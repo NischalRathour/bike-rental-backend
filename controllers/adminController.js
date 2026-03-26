@@ -3,19 +3,23 @@ const Bike = require("../models/Bike");
 const User = require("../models/User");
 
 // --- 📊 1. OPERATIONS INTELLIGENCE (DASHBOARD) ---
+/**
+ * 🛰️ Fetches real-time telemetry including Revenue Trends, Bike Popularity, 
+ * and Environmental Impact (CO2) metrics.
+ */
 exports.getDashboardStats = async (req, res) => {
   try {
-    // Run all counts and aggregations simultaneously for maximum speed
+    // Phase 1: Heavy Lift Aggregation & Base Counts
     const [statsAggregation, totalBookings, availableBikes, totalUsers] = await Promise.all([
       Booking.aggregate([
         {
           $facet: {
             "financials": [
-              { $match: { paymentStatus: { $in: ["Paid", "paid"] } } },
+              { $match: { paymentStatus: { $regex: /paid/i } } }, // Case-insensitive match for "Paid"
               { $group: { _id: null, totalRevenue: { $sum: "$totalPrice" } }}
             ],
             "revenueTrend": [
-              { $match: { paymentStatus: { $in: ["Paid", "paid"] } } },
+              { $match: { paymentStatus: { $regex: /paid/i } } },
               { $group: {
                   _id: { $dayOfWeek: "$createdAt" },
                   revenue: { $sum: "$totalPrice" }
@@ -36,16 +40,15 @@ exports.getDashboardStats = async (req, res) => {
       ]),
       Booking.countDocuments(),
       Bike.countDocuments({ status: "Available" }),
-      User.countDocuments({ role: "customer" })
+      User.countDocuments()
     ]);
 
-    // Safety check for empty aggregation results
     const result = statsAggregation[0] || {};
     const revenue = result.financials?.[0]?.totalRevenue ?? 0;
     const trend = result.revenueTrend ?? [];
     const bikeStats = result.bikePopularity || [];
 
-    // Fetch the 6 most recent bookings for the activity feed
+    // Phase 2: Recent Activity (Traffic Nodes)
     const recentBookings = await Booking.find()
       .sort({ createdAt: -1 })
       .limit(6)
@@ -60,7 +63,8 @@ exports.getDashboardStats = async (req, res) => {
         users: totalUsers,
         bookings: totalBookings,
         availableBikes,
-        co2: (totalBookings * 2.4).toFixed(1),
+        // Formula: 2.4kg of CO2 saved per average bike rental vs car
+        co2: (totalBookings * 2.4).toFixed(1), 
         revenueTrend: trend
       },
       bikeStats,
@@ -72,26 +76,30 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-// --- 👤 2. USER MANAGEMENT ---
+// --- 👤 2. IDENTITY DIRECTORY (USER MANAGEMENT) ---
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: 'customer' }).select('-password').sort({ createdAt: -1 });
+    const users = await User.find({ _id: { $ne: req.user.id } })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
     res.json({ success: true, count: users.length, users });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ success: false, message: "Directory Fetch Failed." }); 
+  }
 };
 
 exports.deleteUserAdmin = async (req, res) => {
   try {
-    // Security check: Prevents an admin from deleting themselves via their own session
     if (req.params.id === req.user.id) {
-        return res.status(400).json({ success: false, message: "Security Breach: Admin cannot self-delete." });
+        return res.status(400).json({ success: false, message: "Security Breach: Admin cannot self-purge." });
     }
     await User.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "User account purged successfully." });
+    res.json({ success: true, message: "Identity node purged successfully." });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
-// --- 🏍️ 3. FLEET MANAGEMENT ---
+// --- 🏍️ 3. FLEET COMMAND (BIKE MANAGEMENT) ---
 exports.addBikeAdmin = async (req, res) => {
   try {
     const bike = await Bike.create({ ...req.body, owner: req.user.id });
@@ -101,7 +109,7 @@ exports.addBikeAdmin = async (req, res) => {
 
 exports.updateBikeAdmin = async (req, res) => {
   try {
-    const bike = await Bike.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const bike = await Bike.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     res.json({ success: true, bike });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
@@ -110,18 +118,18 @@ exports.updateBikeStatusAdmin = async (req, res) => {
   try {
     const { status } = req.body;
     const bike = await Bike.findByIdAndUpdate(req.params.id, { status }, { new: true });
-    res.json({ success: true, message: `Bike status updated to ${status}`, bike });
+    res.json({ success: true, message: `Node ${req.params.id} updated to ${status}`, bike });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
 exports.deleteBikeAdmin = async (req, res) => {
   try {
     await Bike.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Bike unit decommissioned." });
+    res.json({ success: true, message: "Bike unit decommissioned from fleet." });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
-// --- 📋 4. BOOKING MANAGEMENT ---
+// --- 📋 4. BOOKING OPERATIONS ---
 exports.getAllBookingsAdmin = async (req, res) => {
   try {
     const bookings = await Booking.find()
@@ -137,10 +145,10 @@ exports.updateBookingStatusAdmin = async (req, res) => {
     const { status } = req.body;
     const booking = await Booking.findByIdAndUpdate(req.params.id, { status }, { new: true });
 
-    // Synchronization logic: When a booking is confirmed, set all linked bikes to 'Rented'
+    // 🔄 AUTOMATION: Manage Bike Lifecycle based on Booking State
     if (status === 'Confirmed') {
         await Bike.updateMany({ _id: { $in: booking.bikes } }, { status: 'Rented' });
-    } else if (status === 'Cancelled' || status === 'Completed') {
+    } else if (['Cancelled', 'Completed', 'Rejected'].includes(status)) {
         await Bike.updateMany({ _id: { $in: booking.bikes } }, { status: 'Available' });
     }
 
@@ -151,26 +159,26 @@ exports.updateBookingStatusAdmin = async (req, res) => {
 exports.deleteBookingAdmin = async (req, res) => {
   try {
     await Booking.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Booking record purged." });
+    res.json({ success: true, message: "Booking record purged from ledger." });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
-// --- 📄 5. REPORTS ---
+// --- 📄 5. FISCAL REPORTS ---
 exports.generateReportData = async (req, res) => {
   try {
     const stats = await Booking.aggregate([
-      { $match: { paymentStatus: { $in: ['Paid', 'paid'] } } },
+      { $match: { paymentStatus: { $regex: /paid/i } } },
       { $group: { _id: null, rev: { $sum: "$totalPrice" }, count: { $sum: 1 } } }
     ]);
     res.json({ 
         success: true, 
         report: { 
-            generatedAt: new Date().toLocaleString(),
-            status: "Fleet Operational",
+            generatedAt: new Date().toISOString(),
+            status: "Operational High",
             metrics: { 
                 grossRevenue: stats[0]?.rev || 0, 
                 totalConfirmed: stats[0]?.count || 0,
-                ecoImpact: ((stats[0]?.count || 0) * 2.4).toFixed(1) + " KG CO2"
+                ecoImpact: ((stats[0]?.count || 0) * 2.4).toFixed(1) + " KG CO2 Saved"
             } 
         } 
     });
