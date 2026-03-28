@@ -8,14 +8,19 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: [true, "Password is required"], minlength: 6 },
     role: { type: String, enum: ["customer", "owner", "admin"], default: "customer" },
     isVerified: { type: Boolean, default: false },
+    // Standard Verification (Login/Register)
     otpCode: { type: String },
     otpExpires: { type: Date },
+    // Password Reset Specific
+    resetPasswordOTP: { type: String },
+    resetPasswordExpires: { type: Date },
     phone: { type: String },
     address: { type: String },
   },
   { timestamps: true }
 );
 
+// Encrypt password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
@@ -23,6 +28,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
+// Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
