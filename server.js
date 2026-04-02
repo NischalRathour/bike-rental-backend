@@ -55,6 +55,9 @@ app.use("/api/owner", require('./routes/ownerRoutes'));
 app.use("/api/tours", require('./routes/tourRoutes'));
 app.use("/api/blog", require('./routes/blogRoutes'));
 
+// 🚀 ADDED THIS LINE TO FIX YOUR 404 ERROR
+app.use("/api/contact", require('./routes/contactRoutes'));
+
 // ✅ 5. STATIC ASSETS
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/public', express.static(path.join(__dirname, 'public')));

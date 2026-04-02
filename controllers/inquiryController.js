@@ -1,7 +1,7 @@
 const Inquiry = require("../models/Inquiry");
 
-// @desc    Create new tour inquiry
-// @route   POST /api/tours/inquiry
+// @desc    Create new inquiry (Works for both Contact Form & Tours)
+// @route   POST /api/tours/inquiry OR POST /api/contact/inquiry
 exports.createInquiry = async (req, res) => {
   try {
     const { fullName, tourName, groupSize } = req.body;
@@ -10,7 +10,7 @@ exports.createInquiry = async (req, res) => {
     if (!fullName || !tourName) {
       return res.status(400).json({ 
         success: false, 
-        message: "Please provide your full name and the tour you are interested in." 
+        message: "Please provide your full name and the subject/tour name." 
       });
     }
 
