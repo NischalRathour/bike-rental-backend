@@ -1,18 +1,15 @@
 const Bike = require("../models/Bike");
 const Booking = require("../models/Booking");
 
-/** 📊 OWNER INTELLIGENCE: DASHBOARD STATS, REVENUE & TRENDS */
+/** 📊 OWNER DASHBOARD: DATA AGGREGATION */
 exports.getOwnerDashboard = async (req, res) => {
   try {
     const ownerId = req.user.id;
 
     // 1. Fetch Fleet Assets belonging to this owner
     const myBikes = await Bike.find({ owner: ownerId }).lean();
-    
-    // Convert IDs to strings explicitly to match your custom String-based _id schema
     const bikeIds = myBikes.map(b => b._id.toString());
 
-    // 🛡️ Safety: If no bikes, return empty stats immediately
     if (bikeIds.length === 0) {
       return res.json({
         success: true,
@@ -23,13 +20,11 @@ exports.getOwnerDashboard = async (req, res) => {
       });
     }
 
-    // 2. Fetch Aggregated Data with Casting Safety
+    // 2. Fetch Aggregated Data
     const [earningsData, revenueTrend] = await Promise.all([
-      // A. Total Earnings Calculation
       Booking.aggregate([
         { 
           $match: { 
-            // We match the raw value to avoid ObjectId casting issues
             bikes: { $in: bikeIds }, 
             paymentStatus: { $in: ["Paid", "paid"] } 
           } 
@@ -41,8 +36,6 @@ exports.getOwnerDashboard = async (req, res) => {
           } 
         }
       ]),
-
-      // B. Weekly Revenue Trend
       Booking.aggregate([
         { 
           $match: { 
@@ -60,7 +53,6 @@ exports.getOwnerDashboard = async (req, res) => {
       ])
     ]);
 
-    // 3. Fetch Active Rental Stream
     const activeRentals = await Booking.find({ 
       bikes: { $in: bikeIds },
       status: { $in: ["Confirmed", "Pending"] }
@@ -83,23 +75,46 @@ exports.getOwnerDashboard = async (req, res) => {
       activeRentals
     });
   } catch (error) {
-    console.error("🚨 CRITICAL BACKEND ERROR:", error);
-    res.status(500).json({ 
-        success: false, 
-        message: "Dashboard calculation error. Verify asset IDs are consistent." 
-    });
+    console.error("Dashboard Error:", error);
+    res.status(500).json({ success: false, message: "Dashboard calculation error." });
   }
 };
 
 /** 🏍️ FLEET OPERATIONS: ADD NEW UNIT */
 exports.addOwnerBike = async (req, res) => {
   try {
+    const { _id, name, brand, price, type, cc, images, description } = req.body;
+
+    // Strict Validation to prevent 400 Bad Request
+    if (!_id || !name || !brand || !price) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing Required Fields: ID, Name, Brand, and Price must be provided." 
+      });
+    }
+
+    // Check for duplicate ID
+    const bikeExists = await Bike.findById(_id);
+    if (bikeExists) {
+      return res.status(400).json({ success: false, message: "This Bike ID already exists in our Kathmandu fleet." });
+    }
+
     const bike = await Bike.create({ 
-      ...req.body, 
-      owner: req.user.id 
+      _id,
+      name, 
+      brand, 
+      price, 
+      type: type || "Commuter", 
+      cc: cc || "150cc", 
+      description: description || "Premium rental bike in Kathmandu.",
+      images: images && images[0] !== "" ? images : ["/images/default-bike.jpg"],
+      owner: req.user.id,
+      available: true
     });
+
     res.status(201).json({ success: true, bike });
   } catch (error) { 
+    console.error("Add Bike Error:", error.message);
     res.status(400).json({ success: false, message: error.message }); 
   }
 };
@@ -113,14 +128,21 @@ exports.updateOwnerBike = async (req, res) => {
       { new: true, runValidators: true }
     );
     
-    if (!bike) return res.status(403).json({ 
-      success: false, 
-      message: "Unauthorized: Access Denied." 
-    });
-    
+    if (!bike) return res.status(403).json({ success: false, message: "Unauthorized: Access Denied." });
     res.json({ success: true, bike });
   } catch (error) { 
     res.status(400).json({ success: false, message: error.message }); 
+  }
+};
+
+/** 🗑️ FLEET OPERATIONS: DELETE UNIT */
+exports.deleteOwnerBike = async (req, res) => {
+  try {
+    const bike = await Bike.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
+    if (!bike) return res.status(403).json({ success: false, message: "Deletion blocked." });
+    res.json({ success: true, message: "Unit decommissioned." });
+  } catch (error) { 
+    res.status(500).json({ success: false, message: error.message }); 
   }
 };
 
@@ -132,26 +154,9 @@ exports.toggleMaintenance = async (req, res) => {
 
     bike.available = !bike.available;
     bike.status = bike.available ? 'Available' : 'Maintenance';
-    
     await bike.save();
     res.json({ success: true, status: bike.status, available: bike.available });
   } catch (error) { 
     res.status(500).json({ success: false, message: "Sync failed" }); 
-  }
-};
-
-/** 🗑️ FLEET OPERATIONS: DELETE UNIT */
-exports.deleteOwnerBike = async (req, res) => {
-  try {
-    const bike = await Bike.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
-    
-    if (!bike) return res.status(403).json({ 
-      success: false, 
-      message: "Deletion blocked: Ownership not verified." 
-    });
-    
-    res.json({ success: true, message: "Unit decommissioned." });
-  } catch (error) { 
-    res.status(500).json({ success: false, message: error.message }); 
   }
 };

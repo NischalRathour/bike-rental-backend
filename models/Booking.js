@@ -8,23 +8,31 @@ const bookingSchema = new mongoose.Schema(
       required: true 
     },
     
-    // 🏍️ FIXED: Changed from ObjectId to String to match your Bike _id format
-    // This allows the "Cast to ObjectId" error to disappear
+    // ✅ Tour Reference (New)
+    tour: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tour',
+      required: false
+    },
+
+    // 🏍️ Bikes (Now optional so Tours can be booked without bikes)
     bikes: [{ 
       type: String, 
       ref: "Bike", 
-      required: true 
+      required: false 
     }], 
 
-    startDate: { type: Date, required: true },
-    endDate: { type: Date, required: true },
+    startDate: { type: Date, required: false }, // Optional for tours as they have fixed dates
+    endDate: { type: Date, required: false },
     totalPrice: { type: Number, required: true },
     
     bookingType: { 
       type: String, 
-      enum: ["Solo", "Group"], 
+      enum: ["Solo", "Group", "Tour"], // Added "Tour"
       default: "Solo" 
     },
+
+    groupSize: { type: String }, // Added to store tour group info
     
     status: { 
       type: String, 
@@ -40,7 +48,7 @@ const bookingSchema = new mongoose.Schema(
     
     paymentId: { type: String },
     
-    // 🌿 BUSINESS LOGIC: Eco-Tracking
+    // 🌿 Eco-Tracking
     co2Saved: { type: Number, default: 0 }, 
     rewardPoints: { type: Number, default: 0 }
   },

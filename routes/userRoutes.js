@@ -2,8 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 /**
- * ✅ IMPORTANT: These names must match the 'exports.name' 
- * exactly as they appear in userController.js
+ * ✅ FULLY SYNCHRONIZED CONTROLLERS
  */
 const { 
   registerUser, 
@@ -12,19 +11,18 @@ const {
   verifyOTP, 
   resendOTP,
   forgotPassword,
-  resetPassword 
+  resetPassword,
+  updateUserProfile 
 } = require("../controllers/userController");
 
 const { protect } = require("../middleware/authMiddleware");
+// ✅ Ensure you are importing allowRoles from your roleMiddleware file
+const { allowRoles } = require("../middleware/roleMiddleware"); 
 const User = require("../models/User");
 
 // ============================================================
 // 🚨 EMERGENCY ADMIN SETUP
 // ============================================================
-/**
- * Visit: http://localhost:5000/api/users/setup-admin
- * Use this only once to create your master admin account.
- */
 router.get('/setup-admin', async (req, res) => {
   try {
     const adminEmail = "admin@example.com";
@@ -32,15 +30,16 @@ router.get('/setup-admin', async (req, res) => {
     
     if (adminExists) {
       return res.status(200).send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-          <h2 style="color: #6366f1;">Vault Secure</h2>
-          <p>Admin account <strong>${adminEmail}</strong> already exists.</p>
-          <a href="http://localhost:3000/admin-login" style="color: #6366f1;">Go to Login</a>
+        <div style="font-family: sans-serif; text-align: center; padding: 100px; background: #0f172a; color: white; height: 100vh; margin: 0;">
+          <h1 style="color: #6366f1; font-size: 3rem;">VAULT SECURE</h1>
+          <p style="font-size: 1.2rem; color: #94a3b8;">The Master Admin account <strong>${adminEmail}</strong> is already active.</p>
+          <div style="margin-top: 30px;">
+            <a href="http://localhost:3000/admin-login" style="color: white; text-decoration: none; background: #6366f1; padding: 12px 30px; border-radius: 8px; font-weight: bold;">Enter Admin Portal</a>
+          </div>
         </div>
       `);
     }
 
-    // Creating Admin with direct password (pre-save hook will hash it)
     await User.create({
       name: "Master Admin",
       email: adminEmail, 
@@ -50,15 +49,14 @@ router.get('/setup-admin', async (req, res) => {
     });
 
     res.status(201).send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h2 style="color: #10b981;">🚀 Deployment Successful</h2>
-        <p>Master Admin created: <strong>${adminEmail}</strong></p>
-        <p>Password: <strong>AdminPassword123</strong></p>
-        <p style="color: #64748b;">You can now log in at the admin portal.</p>
+      <div style="font-family: sans-serif; text-align: center; padding: 100px; background: #0f172a; color: white; height: 100vh; margin: 0;">
+        <h1 style="color: #10b981; font-size: 3rem;">SYSTEM DEPLOYED</h1>
+        <p style="font-size: 1.2rem;">Master Admin created: <strong style="color: #10b981;">${adminEmail}</strong></p>
+        <p style="font-size: 1.2rem;">Temporary Password: <strong style="color: #f59e0b;">AdminPassword123</strong></p>
       </div>
     `);
   } catch (err) {
-    res.status(500).json({ success: false, message: "System Error: " + err.message });
+    res.status(500).json({ success: false, message: "Critical System Error: " + err.message });
   }
 });
 
@@ -73,50 +71,24 @@ router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
 // ============================================================
-// 🔒 PROTECTED USER ROUTES (Token Required)
+// 🔒 PROTECTED USER ROUTES
 // ============================================================
+
+/**
+ * @route   GET /api/users/me
+ */
 router.get("/me", protect, getMe);
 
 /**
- * Update Profile Logic
- * Handles name, phone, address, and password updates
+ * ✅ THE FIX: Added allowRoles here
+ * This tells the server exactly who can hit this endpoint.
+ * If this was missing, your frontend ProtectedRoute was getting a 403 and redirecting you.
  */
-router.put("/profile", protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    // Update dynamic fields
-    user.name = req.body.name || user.name;
-    user.phone = req.body.phone || user.phone;
-    user.address = req.body.address || user.address;
-    
-    // If a new password is provided, assign it (User.js hashes it on .save())
-    if (req.body.password) {
-      user.password = req.body.password;
-    }
-
-    const updatedUser = await user.save();
-    
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      user: {
-        _id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        phone: updatedUser.phone,
-        address: updatedUser.address
-      }
-    });
-  } catch (err) {
-    console.error("Profile Update Error:", err.message);
-    res.status(500).json({ success: false, message: "Failed to update profile" });
-  }
-});
+router.put(
+  "/profile", 
+  protect, 
+  allowRoles("customer", "owner", "admin"), 
+  updateUserProfile
+);
 
 module.exports = router;

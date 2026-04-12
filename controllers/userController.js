@@ -2,21 +2,27 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const sendEmail = require("../utils/sendEmail");
 
-// 🛰️ TOKEN GENERATOR
+/**
+ * 🛰️ TOKEN GENERATOR
+ * Standard 30-day JWT for session persistence
+ */
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
-// 🛡️ SECURITY HELPER: OTP Dispatch
+/**
+ * 🛡️ SECURITY HELPER: OTP Dispatch
+ * Logic: Generates 6-digit code, sets 10min expiry, and sends HTML Email
+ */
 const sendSecurityOTP = async (user, type = "Verification") => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   
   if (type === "Password Reset") {
     user.resetPasswordOTP = otp;
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
   } else {
     user.otpCode = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
   }
   
   await user.save();
@@ -43,7 +49,7 @@ const sendSecurityOTP = async (user, type = "Verification") => {
   });
 };
 
-// --- 📝 REGISTER (Saves user, sends OTP) ---
+// --- 📝 REGISTER ---
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -61,23 +67,21 @@ exports.registerUser = async (req, res) => {
     
     await sendSecurityOTP(user, "Account Activation");
     res.status(201).json({ success: true, message: "Verification code sent to Gmail" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };
 
-// --- 🔑 LOGIN (DIRECT LOGIN - NO OTP) ---
+// --- 🔑 LOGIN ---
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: cleanEmail }).select('+password');
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
 
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Check if the user verified their email during registration
     if (!user.isVerified && user.role !== 'admin') {
       return res.status(401).json({ 
         message: "Account not active. Please verify your email.", 
@@ -86,19 +90,55 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // 🚀 DIRECT LOGIN: Success (No OTP sent for regular login)
     res.status(200).json({
       success: true,
       token: generateToken(user._id, user.role),
-      user: { _id: user._id, name: user.name, role: user.role, email: user.email }
+      user: { 
+        _id: user._id, 
+        name: user.name, 
+        role: user.role, 
+        email: user.email, 
+        phone: user.phone, 
+        address: user.address, 
+        rewardPoints: user.rewardPoints, 
+        co2Saved: user.co2Saved 
+      }
     });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };
 
-// --- ✅ VERIFY OTP (Used for Register & Forgot Password) ---
+// --- 🛠️ UPDATE PROFILE ---
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    user.name = req.body.name || user.name;
+    user.phone = req.body.phone || user.phone;
+    user.address = req.body.address || user.address;
+
+    const updatedUser = await user.save();
+    res.status(200).json({
+      success: true,
+      user: { 
+        _id: updatedUser._id, 
+        name: updatedUser.name, 
+        email: updatedUser.email, 
+        role: updatedUser.role, 
+        phone: updatedUser.phone, 
+        address: updatedUser.address, 
+        rewardPoints: updatedUser.rewardPoints, 
+        co2Saved: updatedUser.co2Saved 
+      }
+    });
+  } catch (error) { 
+    res.status(500).json({ success: false, message: error.message }); 
+  }
+};
+
+// --- ✅ VERIFY OTP ---
 exports.verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -118,17 +158,17 @@ exports.verifyOTP = async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
-    res.status(200).json({
-      success: true,
-      token: generateToken(user._id, user.role),
-      user: { _id: user._id, name: user.name, role: user.role, email: user.email }
+    res.status(200).json({ 
+      success: true, 
+      token: generateToken(user._id, user.role), 
+      user: { _id: user._id, name: user.name, role: user.role, email: user.email } 
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };
 
-// --- 🔑 FORGOT PASSWORD (Triggers OTP) ---
+// --- 🔑 FORGOT PASSWORD ---
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -138,8 +178,8 @@ exports.forgotPassword = async (req, res) => {
 
     await sendSecurityOTP(user, "Password Reset");
     res.status(200).json({ success: true, message: "Reset code sent to Gmail" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };
 
@@ -155,33 +195,36 @@ exports.resetPassword = async (req, res) => {
 
     if (!user) return res.status(400).json({ message: "Invalid or expired reset code" });
 
-    user.password = newPassword;
+    user.password = newPassword; // Bcrypt hashing happens in User model pre-save hook
     user.resetPasswordOTP = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
 
     res.status(200).json({ success: true, message: "Password updated successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };
 
+// --- 🔄 RESEND OTP ---
 exports.resendOTP = async (req, res) => {
   try {
     const user = await User.findOne({ email: req.body.email.toLowerCase().trim() });
     if (!user) return res.status(404).json({ message: "User not found" });
+    
     await sendSecurityOTP(user, "New Code Request");
     res.status(200).json({ success: true, message: "New OTP sent" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };
 
+// --- 👤 GET CURRENT USER DATA ---
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     res.json({ success: true, user });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 };

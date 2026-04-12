@@ -2,70 +2,46 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 /**
- * --- PRIMARY AUTH GUARD ---
- * Verifies the JWT and attaches the user object to the request.
+ * ✅ 1. THE PROTECTOR (Authentication)
+ * Logic: Verifies who the user is using the JWT.
  */
 const protect = async (req, res, next) => {
   let token;
-
-  // 1. Check for Bearer token in headers
   if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
     try {
-      // Get token from "Bearer <token>"
       token = req.headers.authorization.split(" ")[1];
-
-      // 2. Verify Token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // 3. Attach User to request (exclude password for security)
+      
+      // Attach user to the request
       req.user = await User.findById(decoded.id).select("-password");
-
-      if (!req.user) {
-        return res.status(401).json({ 
-          success: false, 
-          message: "User session not found in database" 
-        });
-      }
-
+      
+      if (!req.user) return res.status(401).json({ message: "User not found" });
       next();
     } catch (error) {
-      console.error("🔒 Token Verification Error:", error.message);
-      
-      // If token is broken or malformed, tell the frontend to clear it
-      return res.status(401).json({ 
-        success: false, 
-        message: error.message === "jwt malformed" 
-          ? "Invalid session format. Please login again." 
-          : "Session expired. Please login again." 
-      });
+      console.error("Auth Error:", error.message);
+      return res.status(401).json({ message: "Not authorized, token failed" });
     }
   }
-
-  // 4. If no token was found at all
-  if (!token) {
-    return res.status(401).json({ 
-      success: false, 
-      message: "Authorization token required for this action." 
-    });
-  }
+  if (!token) return res.status(401).json({ message: "No token provided" });
 };
 
 /**
- * --- ROLE AUTHORIZATION GUARD ---
- * Restricts access to specific roles (e.g., 'admin', 'owner').
+ * ✅ 2. THE GATEKEEPER (Authorization)
+ * Logic: Checks if the user's role is allowed to access the specific route.
  */
 const allowRoles = (...roles) => {
   return (req, res, next) => {
+    // Check if the user's current role exists in the permitted 'roles' array
     if (!req.user || !roles.includes(req.user.role)) {
-      console.warn(`🚨 ROLE DENIED: ${req.user ? req.user.role : 'Guest'} tried to access a restricted path.`);
-      
+      console.warn(`🚨 Security Alert: ${req.user?.role} blocked from restricted path.`);
       return res.status(403).json({ 
         success: false, 
-        message: `Permission Denied: Your account level (${req.user?.role || 'Guest'}) is not authorized.` 
+        message: `Access denied. Role [${req.user?.role}] is not authorized.` 
       });
     }
     next();
   };
 };
 
+// Clean exports
 module.exports = { protect, allowRoles };
