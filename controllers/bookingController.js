@@ -5,25 +5,19 @@ const mongoose = require("mongoose");
 
 /**
  * ✅ 1. CREATE BIKE BOOKING
- * Features: Atomic Transactions, CO2 Logic Engine, and Real-time User Stats Sync
  */
 exports.createBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
-
   try {
     const { bikeIds, startDate, endDate, totalPrice } = req.body;
-    
-    // Calculate Duration
     const start = new Date(startDate);
     const end = new Date(endDate);
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 1;
 
-    // 🌿 UNIQUE FEATURE: Green IT Logic Engine
     const co2Val = (bikeIds.length * days * 2.4).toFixed(1); 
     const pointsVal = (bikeIds.length * 50) + (days * 10);
 
-    // Create Booking Document
     const booking = new Booking({
       user: req.user._id,
       bikes: bikeIds, 
@@ -39,33 +33,13 @@ exports.createBooking = async (req, res) => {
     });
 
     const savedBooking = await booking.save({ session });
+    await Bike.updateMany({ _id: { $in: bikeIds } }, { status: 'Rented' }, { session });
+    await User.findByIdAndUpdate(req.user._id, { $inc: { rewardPoints: pointsVal, co2Saved: parseFloat(co2Val) } }, { session });
 
-    // 🔒 ATOMIC LOGIC: Prevent Double-Booking via Status Update
-    await Bike.updateMany(
-      { _id: { $in: bikeIds } }, 
-      { status: 'Rented' },
-      { session }
-    );
-
-    // 🔄 SYNC TELEMETRY: Update User Profile Analytics instantly
-    await User.findByIdAndUpdate(
-      req.user._id,
-      { 
-        $inc: { 
-          rewardPoints: pointsVal,
-          co2Saved: parseFloat(co2Val)
-        } 
-      },
-      { session, new: true }
-    );
-
-    // Commit all changes as a single unit
     await session.commitTransaction();
     session.endSession();
-
     res.status(201).json({ success: true, booking: savedBooking });
   } catch (error) {
-    // If anything fails, rollback everything (Atomic Logic)
     await session.abortTransaction();
     session.endSession();
     res.status(400).json({ success: false, message: error.message });
@@ -73,38 +47,22 @@ exports.createBooking = async (req, res) => {
 };
 
 /**
- * ✅ 2. NEW: CREATE TOUR BOOKING (Marketplace Checkout Logic)
+ * ✅ 2. CREATE TOUR BOOKING
  */
 exports.createTourBooking = async (req, res) => {
   try {
-    const { tourId, totalPrice, groupSize, fullName } = req.body;
-
-    const pointsVal = 500; // Premium tour bonus
-    const co2Val = 15.5;   // Estimated offset for group tour
-
+    const { tourId, totalPrice, groupSize } = req.body;
     const booking = await Booking.create({
       user: req.user._id,
       tour: tourId,
       totalPrice: totalPrice,
       status: 'Pending',
       paymentStatus: 'Unpaid',
-      rewardPoints: pointsVal,
-      co2Saved: co2Val,
+      rewardPoints: 500,
+      co2Saved: 15.5,
       bookingType: 'Tour',
       groupSize: groupSize
     });
-
-    // Update User Telemetry for the tour booking
-    await User.findByIdAndUpdate(
-      req.user._id,
-      { 
-        $inc: { 
-          rewardPoints: pointsVal,
-          co2Saved: co2Val
-        } 
-      }
-    );
-
     res.status(201).json({ success: true, booking });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -112,13 +70,13 @@ exports.createTourBooking = async (req, res) => {
 };
 
 /**
- * ✅ 3. GET PERSONAL BOOKINGS (Customer/Owner)
+ * ✅ 3. GET PERSONAL BOOKINGS (Needed for the "Confirmed" Ribbon)
  */
 exports.getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ user: req.user._id })
       .populate("bikes")
-      .populate("tour") // Added tour population
+      .populate("tour")
       .sort({ createdAt: -1 });
     res.json({ success: true, bookings });
   } catch (error) {
@@ -131,36 +89,20 @@ exports.getMyBookings = async (req, res) => {
  */
 exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id)
-      .populate("user", "name email")
-      .populate("bikes")
-      .populate("tour"); // Added tour population
-    
+    const booking = await Booking.findById(req.params.id).populate("user", "name email").populate("bikes").populate("tour");
     if (!booking) return res.status(404).json({ success: false, message: "Booking record not found" });
     res.json({ success: true, booking });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
 /**
- * ✅ 5. UPDATE PAYMENT STATUS (Post-Stripe Checkout)
+ * ✅ 5. UPDATE PAYMENT STATUS
  */
 exports.updateBookingWithPayment = async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndUpdate(
-      req.params.id, 
-      { 
-        status: 'Confirmed', 
-        paymentStatus: 'Paid', 
-        paymentId: req.body.paymentId 
-      },
-      { new: true }
-    );
+    const booking = await Booking.findByIdAndUpdate(req.params.id, { status: 'Confirmed', paymentStatus: 'Paid', paymentId: req.body.paymentId }, { new: true });
     res.json({ success: true, booking });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
+  } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
 /**
@@ -168,28 +110,17 @@ exports.updateBookingWithPayment = async (req, res) => {
  */
 exports.getAllBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find()
-      .populate("user", "name")
-      .populate("bikes")
-      .populate("tour"); // Added tour population
+    const bookings = await Booking.find().populate("user", "name").populate("bikes").populate("tour");
     res.json({ success: true, bookings });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
 /**
- * ✅ 7. ADMIN: LIFECYCLE MANAGEMENT
+ * ✅ 7. ADMIN: UPDATE STATUS
  */
 exports.updateBookingStatus = async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndUpdate(
-      req.params.id, 
-      { status: req.body.status }, 
-      { new: true }
-    );
+    const booking = await Booking.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
     res.json({ success: true, booking });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
+  } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
