@@ -4,7 +4,6 @@ const sendEmail = require("../utils/sendEmail");
 
 /**
  * 🛰️ TOKEN GENERATOR
- * Standard 30-day JWT for session persistence
  */
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "30d" });
@@ -12,7 +11,6 @@ const generateToken = (id, role) => {
 
 /**
  * 🛡️ SECURITY HELPER: OTP Dispatch
- * Logic: Generates 6-digit code, sets 10min expiry, and sends HTML Email
  */
 const sendSecurityOTP = async (user, type = "Verification") => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -62,12 +60,14 @@ exports.registerUser = async (req, res) => {
       name: name.trim(), 
       email: cleanEmail, 
       password, 
-      role: role || "customer" 
+      role: role || "customer",
+      balance: 50000 // ✅ Explicitly setting initial Visa balance on registration
     });
     
     await sendSecurityOTP(user, "Account Activation");
     res.status(201).json({ success: true, message: "Verification code sent to Gmail" });
   } catch (error) { 
+    console.error("Registration Error:", error.message);
     res.status(500).json({ message: error.message }); 
   }
 };
@@ -90,6 +90,7 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    // ✅ SUCCESS: Returning the 'balance' so the Visa Card UI updates immediately
     res.status(200).json({
       success: true,
       token: generateToken(user._id, user.role),
@@ -98,6 +99,7 @@ exports.loginUser = async (req, res) => {
         name: user.name, 
         role: user.role, 
         email: user.email, 
+        balance: user.balance, // 🏦 Added for Visa Logic
         phone: user.phone, 
         address: user.address, 
         rewardPoints: user.rewardPoints, 
@@ -105,7 +107,8 @@ exports.loginUser = async (req, res) => {
       }
     });
   } catch (error) { 
-    res.status(500).json({ message: error.message }); 
+    console.error("Login Error:", error.message);
+    res.status(500).json({ message: "Internal Server Error" }); 
   }
 };
 
@@ -127,6 +130,7 @@ exports.updateUserProfile = async (req, res) => {
         name: updatedUser.name, 
         email: updatedUser.email, 
         role: updatedUser.role, 
+        balance: updatedUser.balance, // ✅ Keep balance in sync
         phone: updatedUser.phone, 
         address: updatedUser.address, 
         rewardPoints: updatedUser.rewardPoints, 
@@ -161,7 +165,13 @@ exports.verifyOTP = async (req, res) => {
     res.status(200).json({ 
       success: true, 
       token: generateToken(user._id, user.role), 
-      user: { _id: user._id, name: user.name, role: user.role, email: user.email } 
+      user: { 
+        _id: user._id, 
+        name: user.name, 
+        role: user.role, 
+        email: user.email,
+        balance: user.balance // ✅ Ensure UI gets balance after verification
+      } 
     });
   } catch (error) { 
     res.status(500).json({ message: error.message }); 
@@ -195,7 +205,7 @@ exports.resetPassword = async (req, res) => {
 
     if (!user) return res.status(400).json({ message: "Invalid or expired reset code" });
 
-    user.password = newPassword; // Bcrypt hashing happens in User model pre-save hook
+    user.password = newPassword; 
     user.resetPasswordOTP = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();

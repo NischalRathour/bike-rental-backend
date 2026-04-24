@@ -9,6 +9,13 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ["customer", "owner", "admin"], default: "customer" },
     isVerified: { type: Boolean, default: false },
     
+    // 🏦 FINTECH SUBSYSTEM: Virtual Wallet
+    // Without this, the paymentController won't find a 'balance' to deduct from
+    balance: { 
+      type: Number, 
+      default: 50000 // Rs. 50,000 starting credit for new users
+    },
+
     // Standard Verification (Login/Register)
     otpCode: { type: String },
     otpExpires: { type: Date },
@@ -21,14 +28,17 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, default: "" },
     address: { type: String, default: "" },
 
-    // ✅ GREEN IT TELEMETRY (Crucial for Dashboard)
+    // ✅ GREEN IT TELEMETRY (For Dashboard)
     rewardPoints: { type: Number, default: 0 },
     co2Saved: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-// 🛡️ ENCRYPTION ENGINE: Standard Bcrypt Hashing
+/**
+ * 🛡️ ENCRYPTION ENGINE
+ * Automatically hashes the password before saving to the DB
+ */
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
@@ -36,7 +46,10 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// 🔑 AUTHENTICATION HELPER: Atomic Hash Comparison
+/**
+ * 🔑 AUTHENTICATION HELPER
+ * Required for the Login process to verify the user's password
+ */
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

@@ -6,7 +6,10 @@ const {
 } = require("../controllers/paymentController");
 const { protect } = require("../middleware/authMiddleware");
 
-// All payment routes require a logged-in user
+/**
+ * 🛰️ SECURE PAYMENT SUBSYSTEM ROUTES
+ * Protected by JWT authorization
+ */
 router.use(protect);
 
 router.post("/create-intent", createPaymentIntent);
