@@ -1,9 +1,8 @@
 const mongoose = require("mongoose");
 
 /**
- * 🏁 RIDE N ROAR DYNAMIC BOOKING MODEL
- * Logic: Handles Solo, Group, and Tour reservations with integrated 
- * financial validation and green-tech telemetry.
+ * 🏁 RIDE N ROAR - ENTERPRISE BOOKING MODEL
+ * Logic: Synchronized for Custom String IDs and Atomic Financial Ledger.
  */
 const bookingSchema = new mongoose.Schema(
   {
@@ -11,39 +10,41 @@ const bookingSchema = new mongoose.Schema(
     user: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "User", 
-      required: [true, "A user reference is mandatory for the ledger."] 
+      required: [true, "User reference is mandatory."] 
     },
 
     // 🗺️ EXPEDITION CONTEXT
     tour: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tour',
-      required: false // Only required if bookingType is "Tour"
+      required: false 
     },
 
-    // 🏍️ THE MACHINES (Supports multiple for Group Orchestration)
+    /**
+     * 🏍️ THE MACHINES
+     * 🚨 SYNC FIX: Changed from ObjectId to String to accept custom IDs.
+     */
     bikes: [{ 
-      type: mongoose.Schema.Types.ObjectId, 
+      type: String, 
       ref: "Bike", 
-      required: false 
+      required: [true, "At least one machine is required."] 
     }], 
 
-    // 📅 DYNAMIC TIMELINE
-    // Required: true ensures calculateDays() in the controller never fails
+    // 📅 EXPEDITION TIMELINE
     startDate: { 
       type: Date, 
-      required: [true, "Selection phase requires a start date."] 
+      required: [true, "Start date required."] 
     },
     endDate: { 
       type: Date, 
-      required: [true, "Selection phase requires an end date."] 
+      required: [true, "End date required."] 
     },
 
-    // 💰 THE LEDGER (Financial Core)
+    // 💰 FINANCIAL LEDGER
     totalPrice: { 
       type: Number, 
-      required: [true, "Total price must be finalized before saving."],
-      min: [1, "Financial sync failed: Price cannot be 0 for Stripe intent."]
+      required: [true, "Total price is mandatory."],
+      min: [1, "Price must be greater than 0."]
     },
     
     bookingType: { 
@@ -70,39 +71,24 @@ const bookingSchema = new mongoose.Schema(
       default: "Unpaid" 
     },
     
-    // 🏦 SETTLEMENT METADATA
-    paymentId: { 
-      type: String,
-      trim: true 
-    },
-    paymentDate: { 
-      type: Date 
-    }, 
+    // 🏦 STRIPE METADATA
+    paymentId: { type: String, trim: true },
+    paymentDate: { type: Date }, 
     
-    // 🌿 ECO-TELEMETRY & GAMIFICATION
-    co2Saved: { 
-      type: Number, 
-      default: 0 
-    }, 
-    rewardPoints: { 
-      type: Number, 
-      default: 0 
-    }
+    // 🌿 ECO-TELEMETRY
+    co2Saved: { type: Number, default: 0 }, 
+    rewardPoints: { type: Number, default: 0 }
   },
-  { 
-    timestamps: true // Automatically generates createdAt and updatedAt
-  }
+  { timestamps: true }
 );
 
 /**
- * 🛡️ SECURITY HOOK: PRE-SAVE VALIDATION
- * Logic: Blocks any attempt to save a booking with a zero-value price,
- * protecting the Stripe API from 400 Bad Request errors.
+ * 🛡️ SECURITY HOOK: FINANCIAL INTEGRITY
+ * Prevents saving bookings with invalid amounts.
  */
 bookingSchema.pre("save", function (next) {
   if (this.totalPrice <= 0) {
-    console.error(`🚨 SCHEMA_VIOLATION: Attempted to save Booking ID ${this._id} with Rs. 0`);
-    return next(new Error("INTERNAL_FINANCE_ERROR: Transactions must have a value > 0"));
+    return next(new Error("INTERNAL_FINANCE_ERROR: Price cannot be 0"));
   }
   next();
 });
