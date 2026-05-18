@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 
 /**
- * 🏍️ RIDE N ROAR BIKE MODEL
+ * 🏍️ RIDE N ROAR BIKE MODEL (ENTERPRISE EDITION)
  * Logic: Every bike must be linked to a verified Owner.
- * This ensures the showroom only displays authentic, manageable machines.
+ * Synchronized with the high-fidelity showroom UI.
  */
 const bikeSchema = new mongoose.Schema(
   {
@@ -12,28 +12,47 @@ const bikeSchema = new mongoose.Schema(
     
     name: { 
       type: String, 
-      required: [true, "Bike name is required"], 
+      required: [true, "Bike name is mandatory"], 
       trim: true 
     },
     brand: { 
       type: String, 
-      required: [true, "Brand is required"], 
+      required: [true, "Brand is mandatory"], 
       trim: true 
     },
     price: { 
       type: Number, 
-      required: [true, "Bike price is required"], 
-      min: 0 
-    },
-    cc: { 
-      type: String, 
-      default: "150cc" 
+      required: [true, "Daily rental price is mandatory"], 
+      min: [0, "Price cannot be negative"] 
     },
     
+    /**
+     * ⚙️ ENGINE CAPACITY
+     * Changed to Number for better filtering and comparison logic.
+     */
+    cc: { 
+      type: Number, 
+      required: [true, "Engine CC is required for technical specs"],
+      default: 150 
+    },
+    
+    /**
+     * 🏷️ CATEGORY CLASSIFICATION
+     * Aligned with the frontend filter pills.
+     */
     type: { 
       type: String, 
       enum: ["Commuter", "Adventure", "Sport", "Cruiser", "Scooter", "Dirt"], 
       default: "Commuter" 
+    },
+
+    /**
+     * 🚀 PREMIUM FEATURES (The Showroom Upgrade)
+     * Array of strings to store specific bike attributes like "ABS", "LED", etc.
+     */
+    features: {
+      type: [String],
+      default: []
     },
     
     images: { 
@@ -43,8 +62,7 @@ const bikeSchema = new mongoose.Schema(
     
     /**
      * 🛡️ OWNER LINKAGE (The Anchor)
-     * Changed to required: true to prevent "Ownerless" bikes from appearing.
-     * This links the bike to the User ID of the 'Owner' actor.
+     * Links the machine to the verified 'Owner' account.
      */
     owner: { 
       type: mongoose.Schema.Types.ObjectId, 
@@ -55,6 +73,16 @@ const bikeSchema = new mongoose.Schema(
     available: { 
       type: Boolean, 
       default: true 
+    },
+
+    /**
+     * 🚦 STATUS TELEMETRY
+     * Aligned with "Fleet Command" to track active rentals.
+     */
+    status: {
+      type: String,
+      enum: ["Ready", "Rented", "Maintenance"],
+      default: "Ready"
     },
 
     co2SavedPerKm: { 
@@ -68,7 +96,18 @@ const bikeSchema = new mongoose.Schema(
       default: "Premium rental bike in Kathmandu hub." 
     }
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    // Ensures virtuals are included when converting to JSON (useful for calculations)
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
 );
+
+/**
+ * 🔍 INDEXING
+ * Optimized for the search bar logic in Bikes.jsx
+ */
+bikeSchema.index({ name: 'text', brand: 'text' });
 
 module.exports = mongoose.model("Bike", bikeSchema);

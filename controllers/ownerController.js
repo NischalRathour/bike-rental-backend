@@ -20,7 +20,7 @@ exports.getOwnerDashboard = async (req, res) => {
       });
     }
 
-    // 2. Fetch Aggregated Data
+    // 2. Fetch Aggregated Data (Earnings and Trends)
     const [earningsData, revenueTrend] = await Promise.all([
       Booking.aggregate([
         { 
@@ -83,33 +83,37 @@ exports.getOwnerDashboard = async (req, res) => {
 /** 🏍️ FLEET OPERATIONS: ADD NEW UNIT */
 exports.addOwnerBike = async (req, res) => {
   try {
-    const { _id, name, brand, price, type, cc, images, description } = req.body;
+    const { _id, name, brand, price, type, cc, images, description, features } = req.body;
 
-    // Strict Validation to prevent 400 Bad Request
+    // 1. Strict Validation: Ensure mandatory fields are present
     if (!_id || !name || !brand || !price) {
       return res.status(400).json({ 
         success: false, 
-        message: "Missing Required Fields: ID, Name, Brand, and Price must be provided." 
+        message: "Missing Required Fields: ID, Name, Brand, and Price are mandatory." 
       });
     }
 
-    // Check for duplicate ID
+    // 2. Check for duplicate ID
     const bikeExists = await Bike.findById(_id);
     if (bikeExists) {
-      return res.status(400).json({ success: false, message: "This Bike ID already exists in our Kathmandu fleet." });
+      return res.status(400).json({ success: false, message: "This Bike ID already exists in the fleet." });
     }
 
+    // 3. Create Bike with Data Sanitization
     const bike = await Bike.create({ 
-      _id,
-      name, 
-      brand, 
-      price, 
+      _id: _id.trim(),
+      name: name.trim(), 
+      brand: brand.trim(), 
+      price: Number(price), // Explicitly cast to Number
       type: type || "Commuter", 
-      cc: cc || "150cc", 
+      // Cleans "150cc" strings to Number 150
+      cc: cc ? Number(String(cc).replace(/cc/gi, '')) : 150, 
       description: description || "Premium rental bike in Kathmandu.",
-      images: images && images[0] !== "" ? images : ["/images/default-bike.jpg"],
-      owner: req.user.id,
-      available: true
+      features: features || [], 
+      images: (images && images.length > 0 && images[0] !== "") ? images : ["/images/default-bike.jpg"],
+      owner: req.user.id, 
+      available: true,
+      status: "Ready"
     });
 
     res.status(201).json({ success: true, bike });
@@ -122,13 +126,19 @@ exports.addOwnerBike = async (req, res) => {
 /** 🔧 FLEET OPERATIONS: UPDATE ASSET */
 exports.updateOwnerBike = async (req, res) => {
   try {
+    const updateData = { ...req.body };
+    
+    // Ensure numeric fields are cast correctly if they are being updated
+    if (updateData.price) updateData.price = Number(updateData.price);
+    if (updateData.cc) updateData.cc = Number(String(updateData.cc).replace(/cc/gi, ''));
+
     const bike = await Bike.findOneAndUpdate(
       { _id: req.params.id, owner: req.user.id },
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
     
-    if (!bike) return res.status(403).json({ success: false, message: "Unauthorized: Access Denied." });
+    if (!bike) return res.status(403).json({ success: false, message: "Unauthorized or Asset not found." });
     res.json({ success: true, bike });
   } catch (error) { 
     res.status(400).json({ success: false, message: error.message }); 
@@ -139,8 +149,8 @@ exports.updateOwnerBike = async (req, res) => {
 exports.deleteOwnerBike = async (req, res) => {
   try {
     const bike = await Bike.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
-    if (!bike) return res.status(403).json({ success: false, message: "Deletion blocked." });
-    res.json({ success: true, message: "Unit decommissioned." });
+    if (!bike) return res.status(403).json({ success: false, message: "Deletion blocked or unauthorized." });
+    res.json({ success: true, message: "Unit decommissioned successfully." });
   } catch (error) { 
     res.status(500).json({ success: false, message: error.message }); 
   }
@@ -150,13 +160,14 @@ exports.deleteOwnerBike = async (req, res) => {
 exports.toggleMaintenance = async (req, res) => {
   try {
     const bike = await Bike.findOne({ _id: req.params.id, owner: req.user.id });
-    if (!bike) return res.status(404).json({ success: false, message: "Asset not found" });
+    if (!bike) return res.status(404).json({ success: false, message: "Asset not found." });
 
     bike.available = !bike.available;
-    bike.status = bike.available ? 'Available' : 'Maintenance';
+    bike.status = bike.available ? 'Ready' : 'Maintenance';
     await bike.save();
+    
     res.json({ success: true, status: bike.status, available: bike.available });
   } catch (error) { 
-    res.status(500).json({ success: false, message: "Sync failed" }); 
+    res.status(500).json({ success: false, message: "Status sync failed." }); 
   }
 };

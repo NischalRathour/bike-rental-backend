@@ -13,10 +13,19 @@ const { protect, allowRoles } = require("../middleware/authMiddleware");
 router.use(protect);
 router.use(allowRoles("owner"));
 
+// Fetch stats and fleet list
 router.get("/dashboard", getOwnerDashboard);
+
+// Add a new machine (Uses String _id logic)
 router.post("/add-bike", addOwnerBike); 
+
+// Update existing machine specs
 router.put("/bike/:id", updateOwnerBike);
+
+// Remove machine from system
 router.delete("/bike/:id", deleteOwnerBike);
+
+// Switch between 'Ready' and 'Maintenance'
 router.patch("/maintenance/:id", toggleMaintenance);
 
 module.exports = router;
