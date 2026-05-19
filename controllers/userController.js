@@ -1,9 +1,14 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const sendEmail = require("../utils/sendEmail");
+const { OAuth2Client } = require("google-auth-library");
+
+// Instantiate the official Google OAuth Client
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * 🛰️ TOKEN GENERATOR
+ * Encrypts user identification metadata into a 30-day session token string
  */
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "30d" });
@@ -11,6 +16,7 @@ const generateToken = (id, role) => {
 
 /**
  * 🛡️ SECURITY HELPER: OTP Dispatch
+ * Handles out-of-band numeric token generation and multi-tier email styling rules
  */
 const sendSecurityOTP = async (user, type = "Verification") => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -61,7 +67,7 @@ exports.registerUser = async (req, res) => {
       email: cleanEmail, 
       password, 
       role: role || "customer",
-      balance: 50000 // ✅ Explicitly setting initial Visa balance on registration
+      balance: 50000 // Rs. 50,000 baseline fintech credits allocated upfront
     });
     
     await sendSecurityOTP(user, "Account Activation");
@@ -90,7 +96,6 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // ✅ SUCCESS: Returning the 'balance' so the Visa Card UI updates immediately
     res.status(200).json({
       success: true,
       token: generateToken(user._id, user.role),
@@ -99,7 +104,7 @@ exports.loginUser = async (req, res) => {
         name: user.name, 
         role: user.role, 
         email: user.email, 
-        balance: user.balance, // 🏦 Added for Visa Logic
+        balance: user.balance,
         phone: user.phone, 
         address: user.address, 
         rewardPoints: user.rewardPoints, 
@@ -109,6 +114,63 @@ exports.loginUser = async (req, res) => {
   } catch (error) { 
     console.error("Login Error:", error.message);
     res.status(500).json({ message: "Internal Server Error" }); 
+  }
+};
+
+// --- 🛡️ THIRD-PARTY IDENTITY FEDERATION GATEWAY (GOOGLE SIGN-IN) ---
+exports.googleLogin = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: "OAuth credential payload missing." });
+    }
+
+    // 1. Verify token cryptographic signature against Google public keys
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    // 2. Extract verified assertions from the payload
+    const { email, name } = ticket.getPayload();
+    const cleanEmail = email.toLowerCase().trim();
+
+    // 3. Search system ecosystem for matching identity document
+    let user = await User.findOne({ email: cleanEmail });
+
+    // 4. Just-In-Time Provisioning if it's a first-time single sign-on event
+    if (!user) {
+      user = await User.create({
+        name: name,
+        email: cleanEmail,
+        password: Math.random().toString(36).slice(-12), // Set an arbitrary random passhash string
+        role: "customer",
+        balance: 50000,   // Match virtual fintech baseline card balance
+        isVerified: true  // Identity is pre-validated by Google
+      });
+    }
+
+    // 5. Build Response Object explicitly reflecting database configurations (Crucial for Multiple Owner Defense)
+    res.status(200).json({
+      success: true,
+      token: generateToken(user._id, user.role),
+      user: {
+        _id: user._id,
+        name: user.name,
+        role: user.role, // 🚀 DYNAMIC: Returns the actual updated database role ('owner'/'admin'/'customer')
+        email: user.email,
+        balance: user.balance,
+        phone: user.phone,
+        address: user.address,
+        rewardPoints: user.rewardPoints,
+        co2Saved: user.co2Saved
+      }
+    });
+
+  } catch (error) {
+    console.error("Google Auth Gateway Protocol Error:", error.message);
+    res.status(400).json({ success: false, message: "OAuth cryptographic identity validation failed." });
   }
 };
 
@@ -130,7 +192,7 @@ exports.updateUserProfile = async (req, res) => {
         name: updatedUser.name, 
         email: updatedUser.email, 
         role: updatedUser.role, 
-        balance: updatedUser.balance, // ✅ Keep balance in sync
+        balance: updatedUser.balance,
         phone: updatedUser.phone, 
         address: updatedUser.address, 
         rewardPoints: updatedUser.rewardPoints, 
@@ -170,7 +232,7 @@ exports.verifyOTP = async (req, res) => {
         name: user.name, 
         role: user.role, 
         email: user.email,
-        balance: user.balance // ✅ Ensure UI gets balance after verification
+        balance: user.balance
       } 
     });
   } catch (error) { 

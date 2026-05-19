@@ -4,7 +4,7 @@
  * Use this for routes shared by different users (like Edit Profile).
  * Example: allowRoles("customer", "owner", "admin")
  */
-exports.allowRoles = (...roles) => {
+const allowRoles = (...roles) => {
   return (req, res, next) => {
     // 1. Check if user object exists (must be run after 'protect' middleware)
     if (!req.user) {
@@ -37,7 +37,7 @@ exports.allowRoles = (...roles) => {
  * 👑 ADMIN ONLY GUARD
  * Use this for system-wide settings, deleting users, or financial logs.
  */
-exports.adminOnly = (req, res, next) => {
+const adminOnly = (req, res, next) => {
   if (req.user && req.user.role?.toLowerCase() === "admin") {
     return next();
   }
@@ -51,7 +51,7 @@ exports.adminOnly = (req, res, next) => {
  * 🚲 OWNER ONLY GUARD
  * Use this for bike fleet management and earning reports.
  */
-exports.ownerOnly = (req, res, next) => {
+const ownerOnly = (req, res, next) => {
   if (req.user && req.user.role?.toLowerCase() === "owner") {
     return next();
   }
@@ -59,4 +59,11 @@ exports.ownerOnly = (req, res, next) => {
     success: false, 
     message: "Restricted: Fleet Partner/Owner privileges required." 
   });
+};
+
+// Exporting role authorization guards cleanly as an object
+module.exports = {
+  allowRoles,
+  adminOnly,
+  ownerOnly
 };

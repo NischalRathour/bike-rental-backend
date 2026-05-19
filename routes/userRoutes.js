@@ -3,10 +3,12 @@ const router = express.Router();
 
 /**
  * ✅ FULLY SYNCHRONIZED CONTROLLERS
+ * Unified pipeline for standard credentials and federated third-party identity providers.
  */
 const { 
   registerUser, 
   loginUser, 
+  googleLogin, // 📡 Secure Google OAuth Controller Link
   getMe, 
   verifyOTP, 
   resendOTP,
@@ -16,7 +18,6 @@ const {
 } = require("../controllers/userController");
 
 const { protect } = require("../middleware/authMiddleware");
-// ✅ Ensure you are importing allowRoles from your roleMiddleware file
 const { allowRoles } = require("../middleware/roleMiddleware"); 
 const User = require("../models/User");
 
@@ -65,6 +66,7 @@ router.get('/setup-admin', async (req, res) => {
 // ============================================================
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/google-login", googleLogin); // 🚀 SECURE THIRD-PARTY AUTH OVERLAY
 router.post("/verify-otp", verifyOTP);
 router.post("/resend-otp", resendOTP);
 router.post("/forgot-password", forgotPassword);
@@ -76,13 +78,15 @@ router.post("/reset-password", resetPassword);
 
 /**
  * @route   GET /api/users/me
+ * @desc    Fetch active operator profile metadata
+ * @access  Private
  */
 router.get("/me", protect, getMe);
 
 /**
- * ✅ THE FIX: Added allowRoles here
- * This tells the server exactly who can hit this endpoint.
- * If this was missing, your frontend ProtectedRoute was getting a 403 and redirecting you.
+ * @route   PUT /api/users/profile
+ * @desc    Update profile information (synchronizes name, phone, address, and balances)
+ * @access  Private (Restricted via roleMiddleware check)
  */
 router.put(
   "/profile", 
