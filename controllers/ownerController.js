@@ -56,7 +56,7 @@ exports.getOwnerDashboard = async (req, res) => {
           $group: {
             _id: { $dayOfWeek: { $ifNull: ["$createdAt", new Date()] } },
             amount: { $sum: { $ifNull: ["$totalPrice", 0] } }
-          }
+          } 
         },
         { $sort: { "_id": 1 } }
       ])
@@ -188,5 +188,77 @@ exports.toggleMaintenance = async (req, res) => {
     res.json({ success: true, status: bike.status, available: bike.available });
   } catch (error) { 
     res.status(500).json({ success: false, message: "Fleet tracking status synchronization failure." }); 
+  }
+};
+
+/** 🏁 FLEET OPERATIONS: HANDOVER & TERMINATE ACTIVE RENTAL */
+exports.completeRentalOrder = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking record not found." });
+    }
+
+    if (booking.status === "Completed") {
+      return res.status(400).json({ success: false, message: "This rental order has already been checked in." });
+    }
+
+    booking.status = "Completed";
+    booking.paymentStatus = "Paid"; 
+    await booking.save();
+
+    const bikeIdsToRelease = booking.bikes;
+
+    if (bikeIdsToRelease && bikeIdsToRelease.length > 0) {
+      await Bike.updateMany(
+        { _id: { $in: bikeIdsToRelease } },
+        { available: true, status: "Ready" }
+      );
+    }
+
+    res.status(200).json({ success: true, message: "Vehicles safely processed back into showroom inventory!" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/** 🛠️ OPTIMIZED: MANUAL RENTAL / AVAILABILITY OVERRIDE 
+ * Uses atomic update constraints to bypass strict mongoose file-validation blocks.
+ */
+exports.toggleAvailability = async (req, res) => {
+  try {
+    // 1. Locate the asset first to discover its current internal state safely
+    const bike = await Bike.findOne({ _id: req.params.id, owner: req.user.id });
+    if (!bike) {
+      return res.status(404).json({ success: false, message: "Bike not found or unauthorized access." });
+    }
+
+    // 2. Compute variables locally
+    const targetAvailability = !bike.available;
+    const targetStatus = targetAvailability ? "Ready" : "Rented";
+
+    // 3. Force update using a localized query mutation block (avoids .save() schema loops)
+    const updatedBike = await Bike.findOneAndUpdate(
+      { _id: req.params.id, owner: req.user.id },
+      { 
+        $set: { 
+          available: targetAvailability, 
+          status: targetStatus 
+        } 
+      },
+      { new: true, runValidators: false } // ⚡ Crucial: runValidators: false bypasses historical validation snags
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: `Bike status updated manually to: ${updatedBike.status}`,
+      available: updatedBike.available,
+      status: updatedBike.status
+    });
+  } catch (error) {
+    console.error("🚨 Manual Toggle Core Error Trace:", error.message);
+    res.status(500).json({ success: false, message: "Failed to manually alter availability state: " + error.message });
   }
 };

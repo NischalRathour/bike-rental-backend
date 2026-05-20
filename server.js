@@ -19,19 +19,31 @@ const app = express();
 // ✅ 2. API RATE LIMITER
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
-    max: 500, // Increased for development/testing
+    max: 500, 
     message: { success: false, message: "Too many requests, please try again later." }
 });
 
-// ✅ 3. GLOBAL MIDDLEWARE
+// ✅ 3. GLOBAL MIDDLEWARE WITH COOP FIX
+// Configured to explicitly allow Google Auth popups to pass tokens back to localhost
 app.use(helmet({
     crossOriginResourcePolicy: false, 
-    contentSecurityPolicy: false      
+    contentSecurityPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" } // 🛡️ FIXES POSTMESSAGE BLOCK
 }));
 
-// 🛡️ CORS CONFIGURATION (Fixes net::ERR_FAILED)
+// Fallback Explicit Security Header Override for Local Development Isolation
+app.use((req, res, next) => {
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+    next();
+});
+
+// 🛡️ CORS CONFIGURATION
 app.use(cors({
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        /\.vercel\.app$/ 
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], 
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -54,8 +66,6 @@ app.use("/api/admin", require('./routes/adminRoutes'));
 app.use("/api/owner", require('./routes/ownerRoutes')); 
 app.use("/api/tours", require('./routes/tourRoutes'));
 app.use("/api/blog", require('./routes/blogRoutes'));
-
-// 🚀 ADDED THIS LINE TO FIX YOUR 404 ERROR
 app.use("/api/contact", require('./routes/contactRoutes'));
 
 // ✅ 5. STATIC ASSETS

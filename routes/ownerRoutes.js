@@ -5,7 +5,9 @@ const {
     addOwnerBike, 
     updateOwnerBike, 
     deleteOwnerBike,
-    toggleMaintenance 
+    toggleMaintenance,
+    completeRentalOrder,
+    toggleAvailability // 📡 Import our brand new manual toggle control function
 } = require("../controllers/ownerController");
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 
@@ -27,5 +29,11 @@ router.delete("/bike/:id", deleteOwnerBike);
 
 // Switch between 'Ready' and 'Maintenance'
 router.patch("/maintenance/:id", toggleMaintenance);
+
+// 🏁 Handover System Route: Completes active booking contracts
+router.put("/bookings/:bookingId/complete", completeRentalOrder);
+
+// 🔄 Manual Override: Flip between 'Ready' (Available) and 'Rented' directly
+router.patch("/bike/:id/toggle-availability", toggleAvailability);
 
 module.exports = router;
