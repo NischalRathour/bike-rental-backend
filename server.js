@@ -8,6 +8,16 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 
+// ============================================================
+// ⚡ DYNAMIC ENVIRONMENT OAUTH ROUTER
+// ============================================================
+// Selects the appropriate Client ID variable based on active hosting node runtime
+const googleClientId = process.env.NODE_ENV === 'production' 
+  ? process.env.PROD_GOOGLE_CLIENT_ID 
+  : process.env.LOCAL_GOOGLE_CLIENT_ID;
+
+console.log(`📡 [SYSTEM OAUTH INFO]: Domain Vector routed to standard ${process.env.NODE_ENV || 'development'} profile properties.`);
+
 // ✅ 1. DATABASE INITIALIZATION
 connectDB().catch(err => {
     console.error("❌ Database Connection Failed.");
@@ -57,6 +67,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Apply Rate Limiter
 app.use("/api/", limiter);
 
+// Make googleClientId accessible globally to your routes if needed via request object
+app.use((req, res, next) => {
+    req.googleClientId = googleClientId;
+    next();
+});
+
 // ✅ 4. ROUTE MOUNTING
 app.use("/api/users", require('./routes/userRoutes'));
 app.use("/api/bikes", require('./routes/bikeRoutes'));
@@ -78,7 +94,8 @@ app.get("/", (req, res) => {
         success: true, 
         status: "Live", 
         service: "Ride N Roar Marketplace API",
-        time: new Date().toLocaleTimeString()
+        time: new Date().toLocaleTimeString(),
+        active_environment: process.env.NODE_ENV || 'development'
     });
 });
 
